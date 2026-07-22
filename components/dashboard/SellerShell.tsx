@@ -2,8 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/auth-actions";
 import { Icon, type IconName } from "./Icon";
+import { vendorNav, type SellerNavSection } from "./navConfig";
 
 const RAIL: IconName[] = ["home", "box", "bag", "send", "speaker", "chart", "users", "sliders"];
 
@@ -18,6 +20,7 @@ export function SellerShell({
   showSearch = false,
   notifCount,
   breadcrumb = [{ label: "Home", href: "/" }, { label: "Dashboard" }],
+  nav = vendorNav,
   children,
 }: {
   variant: "vendor" | "admin";
@@ -28,10 +31,14 @@ export function SellerShell({
   showSearch?: boolean;
   notifCount: number;
   breadcrumb?: Crumb[];
+  nav?: SellerNavSection[];
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
+  const pathname = usePathname();
+  const isActive = (href: string) =>
+    href !== "#" && (pathname === href || pathname.startsWith(`${href}/`));
 
   return (
     <div className="flex min-h-screen bg-bg-dash">
@@ -65,25 +72,33 @@ export function SellerShell({
             </span>
             <span className="font-display text-[16px] font-bold text-ink">Home</span>
           </div>
-          <div className="mb-2.5 px-2 font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-soft">
-            Overview
-          </div>
-          <div className="flex flex-col gap-[3px]">
-            <a
-              href="#"
-              className="flex items-center gap-2.5 rounded-md bg-iris-50 px-3 py-2.5 font-sans text-[13.5px] font-semibold text-iris-500"
-            >
-              <Icon name="dash" size={17} />
-              Dashboard
-            </a>
-            <a
-              href="#"
-              className="flex items-center gap-2.5 rounded-md px-3 py-2.5 font-sans text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-field"
-            >
-              <Icon name="pos" size={17} />
-              POS
-            </a>
-          </div>
+          {nav.map((section) => (
+            <div key={section.label} className="mb-4 last:mb-0">
+              <div className="mb-2.5 px-2 font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-soft">
+                {section.label}
+              </div>
+              <div className="flex flex-col gap-[3px]">
+                {section.items.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex items-center gap-2.5 rounded-md px-3 py-2.5 font-sans text-[13.5px] transition-colors ${
+                        active
+                          ? "bg-iris-50 font-semibold text-iris-500"
+                          : "font-medium text-ink-soft hover:bg-field"
+                      }`}
+                    >
+                      <Icon name={item.icon} size={17} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
           <div className="mt-[22px] rounded-lg bg-[linear-gradient(135deg,var(--color-iris-500),var(--color-iris-700))] p-4 text-white">
             <div className="flex items-center gap-2.5">
               <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-md bg-white/[0.16]">

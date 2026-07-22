@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { SellerShell } from "@/components/dashboard/SellerShell";
+import { adminNav } from "@/components/dashboard/navConfig";
 import { StateProvider, StateTabs, StateView } from "@/components/dashboard/PreviewPanel";
 import { RangeAreaChart, DonutChart, CHART } from "@/components/dashboard/Charts";
 import {
@@ -422,6 +423,7 @@ export default async function AdminDashboardPage() {
       setupPercent={38}
       showSearch
       notifCount={12}
+      nav={adminNav}
     >
       <StateProvider>
         <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">

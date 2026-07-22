@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { SellerShell } from "@/components/dashboard/SellerShell";
+import { adminNav } from "@/components/dashboard/navConfig";
 import { Icon, type IconName } from "@/components/dashboard/Icon";
 import { BrandStatusBadge } from "@/components/brands/BrandStatusBadge";
 import { BrandDetailActions } from "@/components/brands/BrandDetailActions";
@@ -41,6 +42,7 @@ export default async function BrandViewPage({ params }: { params: Promise<{ id: 
       setupPercent={38}
       showSearch
       notifCount={12}
+      nav={adminNav}
       breadcrumb={[
         { label: "Dashboard", href: "/admin/dashboard" },
         { label: "Brands", href: "/admin/brands" },

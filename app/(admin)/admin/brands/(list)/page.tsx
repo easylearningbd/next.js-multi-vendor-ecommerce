@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { SellerShell } from "@/components/dashboard/SellerShell";
+import { adminNav } from "@/components/dashboard/navConfig";
 import { BrandsManager } from "@/components/brands/BrandsManager";
 import { getBrands } from "../actions";
 
@@ -38,6 +39,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Searc
       showSearch
       notifCount={12}
       breadcrumb={[{ label: "Dashboard", href: "/admin/dashboard" }, { label: "Brands" }]}
+      nav={adminNav}
     >
       <BrandsManager
         brands={data?.brands ?? []}
