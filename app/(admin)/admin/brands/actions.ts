@@ -72,7 +72,7 @@ async function countBrandProducts(_brandId: string): Promise<number> {
 // Create
 // ─────────────────────────────────────────────────────────────
 export async function createBrand(
-  _prev: ActionResult | undefined,
+  _prev: ActionResult<BrandListItem> | undefined,
   formData: FormData,
 ): Promise<ActionResult<BrandListItem>> {
   const denied = await requireAdmin();
@@ -124,7 +124,7 @@ export async function createBrand(
 // ─────────────────────────────────────────────────────────────
 export async function updateBrand(
   id: string,
-  _prev: ActionResult | undefined,
+  _prev: ActionResult<BrandListItem> | undefined,
   formData: FormData,
 ): Promise<ActionResult<BrandListItem>> {
   const denied = await requireAdmin();
@@ -258,28 +258,24 @@ export async function getBrands(query: BrandsQuery = {}): Promise<ActionResult<B
   };
 
   try {
-    const [total, rows] = await Promise.all([
-      prisma.brand.count({ where }),
-      prisma.brand.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-    ]);
+    const total = await prisma.brand.count({ where });
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    // Clamp so navigating past the last page never shows a false "empty" state.
+    const safePage = Math.min(page, totalPages);
+
+    const rows = await prisma.brand.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * pageSize,
+      take: pageSize,
+    });
 
     // productCount is 0 for every brand until the Product model exists.
     const brands: BrandListItem[] = rows.map((b) => ({ ...b, productCount: 0 }));
 
     return {
       success: true,
-      data: {
-        brands,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      },
+      data: { brands, total, page: safePage, pageSize, totalPages },
     };
   } catch {
     return { success: false, error: "Couldn't load brands. Please try again." };

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { signOutAction } from "@/lib/auth-actions";
 import { Icon, type IconName } from "./Icon";
 
 const RAIL: IconName[] = ["home", "box", "bag", "send", "speaker", "chart", "users", "sliders"];
+
+export type Crumb = { label: string; href?: string };
 
 export function SellerShell({
   variant,
@@ -14,6 +17,7 @@ export function SellerShell({
   setupPercent,
   showSearch = false,
   notifCount,
+  breadcrumb = [{ label: "Home", href: "/" }, { label: "Dashboard" }],
   children,
 }: {
   variant: "vendor" | "admin";
@@ -23,6 +27,7 @@ export function SellerShell({
   setupPercent: number;
   showSearch?: boolean;
   notifCount: number;
+  breadcrumb?: Crumb[];
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -109,9 +114,23 @@ export function SellerShell({
             <Icon name={open ? "chevronLeft" : "menu"} size={15} strokeWidth={2} />
           </button>
           <div className="flex items-center gap-2 font-sans text-[13px] font-medium">
-            <span className="text-iris-500">Home</span>
-            <Icon name="chevronRight" size={14} strokeWidth={2} className="text-[#c6c4ce]" />
-            <span className="text-muted">Dashboard</span>
+            {breadcrumb.map((c, i) => {
+              const last = i === breadcrumb.length - 1;
+              return (
+                <span key={`${c.label}-${i}`} className="flex items-center gap-2">
+                  {i > 0 && (
+                    <Icon name="chevronRight" size={14} strokeWidth={2} className="text-[#c6c4ce]" />
+                  )}
+                  {c.href && !last ? (
+                    <Link href={c.href} className="text-iris-500 hover:text-iris-600">
+                      {c.label}
+                    </Link>
+                  ) : (
+                    <span className={last ? "text-muted" : "text-iris-500"}>{c.label}</span>
+                  )}
+                </span>
+              );
+            })}
           </div>
 
           {showSearch && (

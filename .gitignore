@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 /.env*
 
+# user-uploaded files (local dev storage — see lib/brand-upload.ts TODO(storage))
+/public/uploads/*
+!/public/uploads/.gitkeep
+
 # vercel
 .vercel
 
