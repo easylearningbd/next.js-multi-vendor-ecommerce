@@ -22,6 +22,11 @@ enum VendorStatus {
   SUSPENDED
 }
 
+enum BrandStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -49,6 +54,23 @@ model Vendor {
   updatedAt DateTime     @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Brand {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  // Slug is generated from name now (not retrofitted) — needed for storefront
+  // brand filtering later.
+  slug      String      @unique
+  image     String?
+  status    BrandStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // TODO(product): when the Product model is added, add the back-relation:
+  //   products Product[]
+  // and Product should carry `brandId String?` + `brand Brand? @relation(...)`.
+  // Until then, a brand's product count is 0 and delete is always allowed.
 }
 
 // ---- NextAuth adapter models (present so the Prisma adapter is satisfied;
