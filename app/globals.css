@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Covet design tokens — single source of truth (DESIGN_SYSTEM.md)
+   Mapped into Tailwind v4 @theme so utilities exist:
+   bg-iris-500, text-ink, rounded-xl, shadow-md, font-display, etc.
+   ============================================================ */
+@theme {
+  /* brand — iris scale */
+  --color-iris-50: #f5f2ff;
+  --color-iris-100: #ebe6fe;
+  --color-iris-200: #d8cefe;
+  --color-iris-300: #bca9fb;
+  --color-iris-400: #9b7df5;
+  --color-iris-500: #6544e0;
+  --color-iris-600: #5636c6;
+  --color-iris-700: #472ba3;
+  --color-iris-800: #392585;
+  --color-iris-900: #2e1f6b;
+
+  /* neutrals */
+  --color-ink: #17151f;
+  --color-ink-soft: #3a3745;
+  --color-muted: #75727f;
+  --color-muted-soft: #a5a2ae;
+  --color-line: #ececf1;
+  --color-line-soft: #f1f0f4;
+  --color-surface: #ffffff;
+  --color-bg: #fafafa;
+  --color-bg-dash: #f4f3f7;
+  --color-bg-subtle: #fbfafc;
+  --color-field: #f5f4f7;
+
+  /* status */
+  --color-success: #2e7d53;
+  --color-success-bg: #e6f5ee;
+  --color-warning: #b4741c;
+  --color-warning-bg: #fbefdd;
+  --color-error: #c0403f;
+  --color-error-bg: #fdecec;
+  --color-info: #2c5e9e;
+  --color-info-bg: #eaf1fc;
+  --color-accent-fg: #472ba3;
+  --color-accent-bg: #ebe6fe;
+  --color-star: #e8a13a;
+
+  /* solid status hues */
+  --color-danger: #e5484d;
+
+  /* fonts (variables supplied by next/font in layout.tsx) */
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-instrument), system-ui, sans-serif;
+
+  /* radius */
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+
+  /* elevation */
+  --shadow-xs: 0 1px 2px rgba(20, 18, 31, 0.05);
+  --shadow-sm: 0 4px 12px -2px rgba(20, 18, 31, 0.12);
+  --shadow-md: 0 16px 34px -14px rgba(20, 18, 31, 0.18);
+  --shadow-lg: 0 26px 64px -16px rgba(20, 18, 31, 0.28);
+  --shadow-xl: 0 40px 90px -20px rgba(20, 18, 31, 0.5);
+}
+
+/* container tokens (not utility-generating) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --container-max: 1600px;
+  --cpad: 40px;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@media (max-width: 1024px) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --cpad: 24px;
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --cpad: 16px;
   }
 }
 
+html {
+  font-size: 17px;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink-soft);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-iris-500);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-iris-600);
+}
+::selection {
+  background: var(--color-iris-100);
+  color: var(--color-iris-700);
+}
+input::placeholder {
+  color: var(--color-muted-soft);
+}
+
+/* brand gradients (reference tokens, keep JSX clean) */
+.bg-brand-gradient {
+  background: linear-gradient(
+    140deg,
+    var(--color-iris-900) 0%,
+    var(--color-iris-700) 55%,
+    var(--color-iris-500) 100%
+  );
+}
+.bg-brand-gradient-soft {
+  background: linear-gradient(120deg, var(--color-iris-50), #fbfaff);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -450px 0;
+  }
+  100% {
+    background-position: 450px 0;
+  }
 }
