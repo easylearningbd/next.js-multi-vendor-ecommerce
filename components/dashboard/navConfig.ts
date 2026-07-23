@@ -1,6 +1,16 @@
 import type { IconName } from "./Icon";
 
-export type SellerNavItem = { label: string; href: string; icon: IconName };
+/** A leaf link inside a collapsible group. */
+export type SellerNavLeaf = { label: string; href: string };
+
+/** A sidebar entry: either a leaf link (has `href`) or a collapsible group (has `children`). */
+export type SellerNavItem = {
+  label: string;
+  icon: IconName;
+  href?: string;
+  children?: SellerNavLeaf[];
+};
+
 export type SellerNavSection = { label: string; items: SellerNavItem[] };
 
 export const vendorNav: SellerNavSection[] = [
@@ -20,7 +30,17 @@ export const adminNav: SellerNavSection[] = [
   },
   {
     label: "Catalog",
-    items: [{ label: "Brands", href: "/admin/brands", icon: "tag" }],
+    items: [
+      { label: "Brands", href: "/admin/brands", icon: "tag" },
+      {
+        label: "Category Setup",
+        icon: "layers",
+        children: [
+          { label: "Categories", href: "/admin/categories" },
+          { label: "Sub Categories", href: "/admin/sub-categories" },
+          { label: "Sub Sub Categories", href: "/admin/sub-sub-categories" },
+        ],
+      },
+    ],
   },
-  
 ];

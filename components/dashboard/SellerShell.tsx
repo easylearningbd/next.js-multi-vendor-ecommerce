@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/auth-actions";
@@ -15,6 +15,9 @@ export type Crumb = { label: string; href?: string };
 const CRUMB_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   brands: "Brands",
+  categories: "Categories",
+  "sub-categories": "Sub Categories",
+  "sub-sub-categories": "Sub Sub Categories",
   products: "Products",
   orders: "Orders",
   customers: "Customers",
@@ -74,6 +77,34 @@ export function SellerShell({
     href !== "#" && (pathname === href || pathname.startsWith(`${href}/`));
   const crumbs = breadcrumb ?? deriveCrumbs(pathname);
 
+  // Collapsible sidebar groups (e.g. "Category Setup"). Any group whose child
+  // matches the current route starts expanded and re-opens when the route changes.
+  const groupsWithActiveChild = () =>
+    nav
+      .flatMap((s) => s.items)
+      .filter((it) => it.children?.some((c) => isActive(c.href)))
+      .map((it) => it.label);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(groupsWithActiveChild()),
+  );
+  const toggleGroup = (label: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+  useEffect(() => {
+    const active = groupsWithActiveChild();
+    if (active.length) {
+      setOpenGroups((prev) => {
+        const next = new Set(prev);
+        active.forEach((l) => next.add(l));
+        return next;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   return (
     <div className="flex min-h-screen bg-bg-dash">
       {/* ICON RAIL */}
@@ -113,11 +144,71 @@ export function SellerShell({
               </div>
               <div className="flex flex-col gap-[3px]">
                 {section.items.map((item) => {
-                  const active = isActive(item.href);
+                  // ── Collapsible group (e.g. Category Setup) ──
+                  if (item.children) {
+                    const childActive = item.children.some((c) => isActive(c.href));
+                    const isOpen = openGroups.has(item.label);
+                    return (
+                      <div key={item.label}>
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(item.label)}
+                          aria-expanded={isOpen}
+                          className={`flex w-full items-center justify-between gap-2.5 rounded-md px-3 py-2.5 font-sans text-[13.5px] transition-colors ${
+                            childActive
+                              ? "font-semibold text-iris-500"
+                              : "font-medium text-ink-soft hover:bg-field"
+                          }`}
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <Icon name={item.icon} size={17} />
+                            {item.label}
+                          </span>
+                          <Icon
+                            name="chevronDown"
+                            size={15}
+                            strokeWidth={2}
+                            className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${
+                              childActive ? "text-iris-500" : "text-muted-soft"
+                            }`}
+                          />
+                        </button>
+                        {isOpen && (
+                          <div className="ml-[26px] mt-0.5 flex flex-col gap-0.5 border-l border-line-soft pl-3">
+                            {item.children.map((child) => {
+                              const a = isActive(child.href);
+                              return (
+                                <Link
+                                  key={child.label}
+                                  href={child.href}
+                                  aria-current={a ? "page" : undefined}
+                                  className={`flex items-center gap-2.5 rounded-md px-3 py-2 font-sans text-[13px] transition-colors ${
+                                    a
+                                      ? "bg-iris-50 font-semibold text-iris-500"
+                                      : "font-medium text-muted hover:bg-field hover:text-ink"
+                                  }`}
+                                >
+                                  <span
+                                    className={`h-1.5 w-1.5 flex-none rounded-full ${
+                                      a ? "bg-iris-500" : "bg-muted-soft"
+                                    }`}
+                                  />
+                                  {child.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // ── Leaf link ──
+                  const active = item.href ? isActive(item.href) : false;
                   return (
                     <Link
                       key={item.label}
-                      href={item.href}
+                      href={item.href ?? "#"}
                       aria-current={active ? "page" : undefined}
                       className={`flex items-center gap-2.5 rounded-md px-3 py-2.5 font-sans text-[13.5px] transition-colors ${
                         active

@@ -37,6 +37,8 @@ const STROKE: Record<string, Seg[]> = {
     ["rect", { x: 14, y: 12, width: 7, height: 9 }], ["rect", { x: 3, y: 16, width: 7, height: 5 }],
   ],
   pos: [["rect", { x: 2, y: 3, width: 20, height: 14, rx: 2 }], ["line", { x1: 8, y1: 21, x2: 16, y2: 21 }], ["line", { x1: 12, y1: 17, x2: 12, y2: 21 }]],
+  layers: [["polygon", { points: "12 2 2 7 12 12 22 7 12 2" }], ["polyline", { points: "2 17 12 22 22 17" }], ["polyline", { points: "2 12 12 17 22 12" }]],
+  grid: [["rect", { x: 3, y: 3, width: 7, height: 7 }], ["rect", { x: 14, y: 3, width: 7, height: 7 }], ["rect", { x: 14, y: 14, width: 7, height: 7 }], ["rect", { x: 3, y: 14, width: 7, height: 7 }]],
   house: [["path", { d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }]],
   // topbar
   bell: [["path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }], ["path", { d: "M13.73 21a2 2 0 0 1-3.46 0" }]],
