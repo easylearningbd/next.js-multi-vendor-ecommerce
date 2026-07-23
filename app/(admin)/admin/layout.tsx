@@ -1,11 +1,31 @@
 import { requireRole } from "@/lib/guard";
+import { SellerShell } from "@/components/dashboard/SellerShell";
+import { adminNav } from "@/components/dashboard/navConfig";
 
-// Guards /admin/dashboard (NOT /admin/login, which lives in the (auth) group).
+// Persistent admin shell (icon-rail-less): header + sidebar render once here and
+// stay mounted across navigation — only the page content in {children} swaps.
+// Also guards the whole admin area (NOT /admin/login, which is in the (auth) group).
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("ADMIN", "/admin/login");
-  return <>{children}</>;
+  const session = await requireRole("ADMIN", "/admin/login");
+  const user = session.user;
+
+  return (
+    <SellerShell
+      variant="admin"
+      userName={user.name ?? "Admin"}
+      userEmail={user.email ?? ""}
+      signOutTo="/admin/login"
+      setupPercent={38}
+      showSearch
+      notifCount={12}
+      nav={adminNav}
+      showRail={false}
+    >
+      {children}
+    </SellerShell>
+  );
 }

@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import { auth } from "@/auth";
-import { SellerShell } from "@/components/dashboard/SellerShell";
-import { adminNav } from "@/components/dashboard/navConfig";
 import { BrandsManager } from "@/components/brands/BrandsManager";
 import { getBrands } from "../actions";
 
@@ -15,8 +12,6 @@ function one(v: string | string[] | undefined): string | undefined {
 
 export default async function BrandsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const session = await auth();
-  const user = session!.user;
 
   const search = one(sp.search)?.trim() ?? "";
   const statusRaw = one(sp.status);
@@ -30,27 +25,14 @@ export default async function BrandsPage({ searchParams }: { searchParams: Searc
   const data = res.success ? res.data : undefined;
 
   return (
-    <SellerShell
-      variant="admin"
-      userName={user.name ?? "Admin"}
-      userEmail={user.email ?? ""}
-      signOutTo="/admin/login"
-      setupPercent={38}
-      showSearch
-      notifCount={12}
-      breadcrumb={[{ label: "Dashboard", href: "/admin/dashboard" }, { label: "Brands" }]}
-      nav={adminNav}
-      showRail={false}
-    >
-      <BrandsManager
-        brands={data?.brands ?? []}
-        total={data?.total ?? 0}
-        page={data?.page ?? page}
-        pageSize={data?.pageSize ?? pageSize}
-        totalPages={data?.totalPages ?? 1}
-        hasFilters={Boolean(search) || status !== "ALL"}
-        errored={!res.success}
-      />
-    </SellerShell>
+    <BrandsManager
+      brands={data?.brands ?? []}
+      total={data?.total ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.pageSize ?? pageSize}
+      totalPages={data?.totalPages ?? 1}
+      hasFilters={Boolean(search) || status !== "ALL"}
+      errored={!res.success}
+    />
   );
 }

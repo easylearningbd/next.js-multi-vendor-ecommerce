@@ -11,6 +11,37 @@ const RAIL: IconName[] = ["home", "box", "bag", "send", "speaker", "chart", "use
 
 export type Crumb = { label: string; href?: string };
 
+// Human labels for path segments (extend as new admin sections are added).
+const CRUMB_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  brands: "Brands",
+  products: "Products",
+  orders: "Orders",
+  customers: "Customers",
+  vendors: "Vendors",
+};
+
+/** Build breadcrumbs from the current pathname; the crumb matching the URL is
+ *  "current" (no href), earlier crumbs are links, id-like segments are skipped. */
+function deriveCrumbs(pathname: string): Crumb[] {
+  const segs = pathname.split("/").filter(Boolean); // e.g. ['admin','brands','id']
+  const area = segs[0] ? `/${segs[0]}` : "";
+  const rest = segs.slice(1);
+  const crumbs: Crumb[] = [];
+  let href = area;
+  for (const seg of rest) {
+    href += `/${seg}`;
+    const label = CRUMB_LABELS[seg];
+    if (!label) continue; // skip dynamic ids
+    crumbs.push({ label, href: href === pathname ? undefined : href });
+  }
+  if (crumbs.length === 0) return [{ label: "Dashboard" }];
+  if (rest[0] !== "dashboard") {
+    crumbs.unshift({ label: "Dashboard", href: `${area}/dashboard` });
+  }
+  return crumbs;
+}
+
 export function SellerShell({
   variant,
   userName,
@@ -19,7 +50,7 @@ export function SellerShell({
   setupPercent,
   showSearch = false,
   notifCount,
-  breadcrumb = [{ label: "Home", href: "/" }, { label: "Dashboard" }],
+  breadcrumb,
   nav = vendorNav,
   showRail = true,
   children,
@@ -41,6 +72,7 @@ export function SellerShell({
   const pathname = usePathname();
   const isActive = (href: string) =>
     href !== "#" && (pathname === href || pathname.startsWith(`${href}/`));
+  const crumbs = breadcrumb ?? deriveCrumbs(pathname);
 
   return (
     <div className="flex min-h-screen bg-bg-dash">
@@ -131,23 +163,20 @@ export function SellerShell({
             <Icon name={open ? "chevronLeft" : "menu"} size={15} strokeWidth={2} />
           </button>
           <div className="flex items-center gap-2 font-sans text-[13px] font-medium">
-            {breadcrumb.map((c, i) => {
-              const last = i === breadcrumb.length - 1;
-              return (
-                <span key={`${c.label}-${i}`} className="flex items-center gap-2">
-                  {i > 0 && (
-                    <Icon name="chevronRight" size={14} strokeWidth={2} className="text-[#c6c4ce]" />
-                  )}
-                  {c.href && !last ? (
-                    <Link href={c.href} className="text-iris-500 hover:text-iris-600">
-                      {c.label}
-                    </Link>
-                  ) : (
-                    <span className={last ? "text-muted" : "text-iris-500"}>{c.label}</span>
-                  )}
-                </span>
-              );
-            })}
+            {crumbs.map((c, i) => (
+              <span key={`${c.label}-${i}`} className="flex items-center gap-2">
+                {i > 0 && (
+                  <Icon name="chevronRight" size={14} strokeWidth={2} className="text-[#c6c4ce]" />
+                )}
+                {c.href ? (
+                  <Link href={c.href} className="text-iris-500 hover:text-iris-600">
+                    {c.label}
+                  </Link>
+                ) : (
+                  <span className="text-muted">{c.label}</span>
+                )}
+              </span>
+            ))}
           </div>
 
           {showSearch && (

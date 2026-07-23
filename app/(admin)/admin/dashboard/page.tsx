@@ -1,6 +1,4 @@
 import { auth } from "@/auth";
-import { SellerShell } from "@/components/dashboard/SellerShell";
-import { adminNav } from "@/components/dashboard/navConfig";
 import { StateProvider, StateTabs, StateView } from "@/components/dashboard/PreviewPanel";
 import { RangeAreaChart, DonutChart, CHART } from "@/components/dashboard/Charts";
 import {
@@ -415,43 +413,31 @@ export default async function AdminDashboardPage() {
   );
 
   return (
-    <SellerShell
-      variant="admin"
-      userName={user.name ?? "Admin"}
-      userEmail={user.email ?? ""}
-      signOutTo="/admin/login"
-      setupPercent={38}
-      showSearch
-      notifCount={12}
-      nav={adminNav}
-      showRail={false}
-    >
-      <StateProvider>
-        <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-[26px] font-extrabold leading-[1.1] tracking-[-0.01em] text-ink">
-              Welcome {user.name ?? "Admin"}
-            </h1>
-            <p className="mt-3 font-sans text-[14px] text-muted">
-              Monitor your business analytics and statistics.
-            </p>
-          </div>
-          <StateTabs trackClass="bg-[#EDECF1]" />
+    <StateProvider>
+      <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-[26px] font-extrabold leading-[1.1] tracking-[-0.01em] text-ink">
+            Welcome {user.name ?? "Admin"}
+          </h1>
+          <p className="mt-3 font-sans text-[14px] text-muted">
+            Monitor your business analytics and statistics.
+          </p>
         </div>
-        <StateView
-          loading={loading}
-          empty={{
-            title: "No analytics yet",
-            text: "As stores and orders come in across the marketplace, platform analytics will appear here.",
-          }}
-          error={{
-            title: "Couldn't load dashboard",
-            text: "Something went wrong while loading platform analytics. Please try again.",
-          }}
-        >
-          {defaultView}
-        </StateView>
-      </StateProvider>
-    </SellerShell>
+        <StateTabs trackClass="bg-[#EDECF1]" />
+      </div>
+      <StateView
+        loading={loading}
+        empty={{
+          title: "No analytics yet",
+          text: "As stores and orders come in across the marketplace, platform analytics will appear here.",
+        }}
+        error={{
+          title: "Couldn't load dashboard",
+          text: "Something went wrong while loading platform analytics. Please try again.",
+        }}
+      >
+        {defaultView}
+      </StateView>
+    </StateProvider>
   );
 }

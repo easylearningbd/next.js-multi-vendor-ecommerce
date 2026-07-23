@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
-import { SellerShell } from "@/components/dashboard/SellerShell";
-import { adminNav } from "@/components/dashboard/navConfig";
 import { Icon, type IconName } from "@/components/dashboard/Icon";
 import { BrandStatusBadge } from "@/components/brands/BrandStatusBadge";
 import { BrandDetailActions } from "@/components/brands/BrandDetailActions";
@@ -20,8 +17,6 @@ function formatDate(d: Date): string {
 
 export default async function BrandViewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
-  const user = session!.user;
 
   const res = await getBrand(id);
   if (!res.success || !res.data) notFound();
@@ -34,23 +29,7 @@ export default async function BrandViewPage({ params }: { params: Promise<{ id: 
   ];
 
   return (
-    <SellerShell
-      variant="admin"
-      userName={user.name ?? "Admin"}
-      userEmail={user.email ?? ""}
-      signOutTo="/admin/login"
-      setupPercent={38}
-      showSearch
-      notifCount={12}
-      nav={adminNav}
-      showRail={false}
-      breadcrumb={[
-        { label: "Dashboard", href: "/admin/dashboard" },
-        { label: "Brands", href: "/admin/brands" },
-        { label: brand.name },
-      ]}
-    >
-      <div className="flex flex-col gap-[22px]">
+    <div className="flex flex-col gap-[22px]">
         {/* Header card */}
         <div className="rounded-2xl border border-line-soft bg-surface p-[24px_26px] shadow-xs">
           <div className="flex flex-wrap items-start justify-between gap-5">
@@ -163,6 +142,5 @@ export default async function BrandViewPage({ params }: { params: Promise<{ id: 
           )}
         </div>
       </div>
-    </SellerShell>
   );
 }
