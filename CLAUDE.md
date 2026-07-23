@@ -3,6 +3,21 @@
 Persistent instructions for working in this repo. Read `DESIGN_SYSTEM.md` before writing
 any UI — it is the single source of truth for tokens and components.
 
+## DATABASE SAFETY — CRITICAL, NEVER VIOLATE
+The development database contains real data I need to keep. Data loss is unacceptable.
+
+- NEVER run `prisma migrate reset`, `prisma db push --force-reset`, or any command
+  that drops, resets, or recreates the database or its tables.
+- To change the schema (add/modify a field, table, or relation), use ONLY:
+    npx prisma migrate dev --name <descriptive_name>
+  This alters tables in place and PRESERVES existing data.
+- If you believe a migration cannot be done without data loss, STOP. Do not run it.
+  Explain the conflict to me and wait for my decision. I will decide, not you.
+- Never edit or delete files in prisma/migrations/ that are already applied.
+- Never run raw SQL that DROPs or TRUNCATEs tables without asking me first.
+- Before any migration, tell me in one line what it will change.
+
+
 ## What this is
 Covet is a **multi-vendor e-commerce marketplace** (many independent sellers, one
 storefront, one checkout — like Etsy/Amazon). Three audiences share one design language:
