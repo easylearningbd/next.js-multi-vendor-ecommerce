@@ -424,6 +424,7 @@ export default async function AdminDashboardPage() {
       showSearch
       notifCount={12}
       nav={adminNav}
+      showRail={false}
     >
       <StateProvider>
         <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">

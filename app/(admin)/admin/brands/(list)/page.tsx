@@ -40,6 +40,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Searc
       notifCount={12}
       breadcrumb={[{ label: "Dashboard", href: "/admin/dashboard" }, { label: "Brands" }]}
       nav={adminNav}
+      showRail={false}
     >
       <BrandsManager
         brands={data?.brands ?? []}

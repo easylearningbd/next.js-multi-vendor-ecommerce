@@ -21,6 +21,7 @@ export function SellerShell({
   notifCount,
   breadcrumb = [{ label: "Home", href: "/" }, { label: "Dashboard" }],
   nav = vendorNav,
+  showRail = true,
   children,
 }: {
   variant: "vendor" | "admin";
@@ -32,6 +33,7 @@ export function SellerShell({
   notifCount: number;
   breadcrumb?: Crumb[];
   nav?: SellerNavSection[];
+  showRail?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -43,7 +45,7 @@ export function SellerShell({
   return (
     <div className="flex min-h-screen bg-bg-dash">
       {/* ICON RAIL */}
-      {open && (
+      {showRail && open && (
         <div className="sticky top-0 flex h-screen w-16 flex-none flex-col items-center gap-2 bg-ink py-4">
           <div className="mb-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-md bg-iris-500 text-white">
             <Icon name="cart" size={20} strokeWidth={2} />

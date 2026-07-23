@@ -43,6 +43,7 @@ export default async function BrandViewPage({ params }: { params: Promise<{ id: 
       showSearch
       notifCount={12}
       nav={adminNav}
+      showRail={false}
       breadcrumb={[
         { label: "Dashboard", href: "/admin/dashboard" },
         { label: "Brands", href: "/admin/brands" },

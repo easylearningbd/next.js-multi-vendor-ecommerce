@@ -22,4 +22,5 @@ export const adminNav: SellerNavSection[] = [
     label: "Catalog",
     items: [{ label: "Brands", href: "/admin/brands", icon: "tag" }],
   },
+  
 ];
