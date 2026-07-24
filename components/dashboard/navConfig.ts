@@ -37,8 +37,8 @@ export const adminNav: SellerNavSection[] = [
         icon: "layers",
         children: [
           { label: "Categories", href: "/admin/categories" },
-          { label: "Sub Categories", href: "/admin/sub-categories" },
-          { label: "Sub Sub Categories", href: "/admin/sub-sub-categories" },
+          { label: "Sub Categories", href: "/admin/categories/sub" },
+          { label: "Sub Sub Categories", href: "/admin/categories/sub-sub" },
         ],
       },
     ],

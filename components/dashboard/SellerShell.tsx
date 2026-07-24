@@ -16,6 +16,8 @@ const CRUMB_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   brands: "Brands",
   categories: "Categories",
+  sub: "Sub Categories",
+  "sub-sub": "Sub Sub Categories",
   "sub-categories": "Sub Categories",
   "sub-sub-categories": "Sub Sub Categories",
   products: "Products",
@@ -146,7 +148,10 @@ export function SellerShell({
                 {section.items.map((item) => {
                   // ── Collapsible group (e.g. Category Setup) ──
                   if (item.children) {
-                    const childActive = item.children.some((c) => isActive(c.href));
+                    // Dropdown children are distinct leaf pages (e.g. /admin/categories
+                    // is a prefix of /admin/categories/sub) — use EXACT match so only one
+                    // highlights at a time.
+                    const childActive = item.children.some((c) => pathname === c.href);
                     const isOpen = openGroups.has(item.label);
                     return (
                       <div key={item.label}>
@@ -176,7 +181,7 @@ export function SellerShell({
                         {isOpen && (
                           <div className="ml-[26px] mt-0.5 flex flex-col gap-0.5 border-l border-line-soft pl-3">
                             {item.children.map((child) => {
-                              const a = isActive(child.href);
+                              const a = pathname === child.href;
                               return (
                                 <Link
                                   key={child.label}
