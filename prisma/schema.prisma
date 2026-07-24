@@ -73,6 +73,61 @@ model Brand {
   // Until then, a brand's product count is 0 and delete is always allowed.
 }
 
+// ---- Category taxonomy: Category → SubCategory → SubSubCategory ----
+// Names are unique within their parent scope (so the same name can exist under a
+// different parent). Parent relations use onDelete: Restrict — deletes with
+// children are blocked in the app layer, never cascaded.
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subCategories    SubCategory[]
+  subSubCategories SubSubCategory[]
+  // TODO(product): when the Product model exists, add `products Product[]` here and
+  // count via Prisma _count. Until then product counts are computed as 0.
+}
+
+model SubCategory {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String
+  categoryId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category         Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subSubCategories SubSubCategory[]
+  // TODO(product): products Product[] (via Product.subCategoryId) — computed count only.
+
+  @@unique([categoryId, name])
+  @@unique([categoryId, slug])
+  @@index([categoryId])
+}
+
+model SubSubCategory {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String
+  categoryId    String
+  subCategoryId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Restrict)
+  // TODO(product): products Product[] (via Product.subSubCategoryId) — computed count only.
+
+  @@unique([subCategoryId, name])
+  @@unique([subCategoryId, slug])
+  @@index([categoryId])
+  @@index([subCategoryId])
+}
+
 // ---- NextAuth adapter models (present so the Prisma adapter is satisfied;
 //      sessions use JWT, so the Session table is not actively used) ----
 
