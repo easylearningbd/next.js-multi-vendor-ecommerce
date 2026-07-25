@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { SellerShell } from "@/components/dashboard/SellerShell";
 import { StateProvider, StateTabs, StateView } from "@/components/dashboard/PreviewPanel";
 import { RangeAreaChart, CHART } from "@/components/dashboard/Charts";
 import { Card, SectionHead, StatusStat, Thumb, WalletStat, type Tone } from "@/components/dashboard/cards";
@@ -63,8 +61,6 @@ const deliveryMen = [
 export default async function VendorDashboardPage() {
   const session = await auth();
   const user = session!.user;
-  if (user.vendorStatus !== "APPROVED") redirect("/vendor/pending");
-
   const firstName = user.name?.split(" ")[0] ?? "seller";
 
   const defaultView = (
@@ -212,51 +208,42 @@ export default async function VendorDashboardPage() {
   );
 
   return (
-    <SellerShell
-      variant="vendor"
-      userName={user.name ?? "Seller"}
-      userEmail={user.email ?? ""}
-      signOutTo="/vendor/login"
-      setupPercent={20}
-      notifCount={1}
-    >
-      <StateProvider>
-        <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-[26px] font-extrabold leading-[1.1] tracking-[-0.01em] text-ink">
-              Welcome {user.name ?? firstName}
-            </h1>
-            <p className="mt-3 font-sans text-[14px] text-muted">
-              Monitor your business analytics and statistics.
-            </p>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="hidden font-sans text-[12px] text-muted-soft sm:inline">Preview state</span>
-            <StateTabs trackClass="bg-[#EDECF1]" />
-            <button
-              type="button"
-              className="flex h-11 items-center gap-2 rounded-md bg-iris-500 px-5 font-display text-[13px] font-bold text-white transition-colors hover:bg-iris-600"
-            >
-              <Icon name="box" size={17} strokeWidth={2} />
-              Products
-            </button>
-          </div>
+    <StateProvider>
+      <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-[26px] font-extrabold leading-[1.1] tracking-[-0.01em] text-ink">
+            Welcome {user.name ?? firstName}
+          </h1>
+          <p className="mt-3 font-sans text-[14px] text-muted">
+            Monitor your business analytics and statistics.
+          </p>
         </div>
-        <StateView
-          loading={loading}
-          empty={{
-            title: "No analytics yet",
-            text: "Once you start selling, your business analytics and earnings will appear here.",
-            actionLabel: "Add your first product",
-          }}
-          error={{
-            title: "Couldn't load your dashboard",
-            text: "Something went wrong while loading your analytics. Please try again.",
-          }}
-        >
-          {defaultView}
-        </StateView>
-      </StateProvider>
-    </SellerShell>
+        <div className="flex items-center gap-2.5">
+          <span className="hidden font-sans text-[12px] text-muted-soft sm:inline">Preview state</span>
+          <StateTabs trackClass="bg-[#EDECF1]" />
+          <button
+            type="button"
+            className="flex h-11 items-center gap-2 rounded-md bg-iris-500 px-5 font-display text-[13px] font-bold text-white transition-colors hover:bg-iris-600"
+          >
+            <Icon name="box" size={17} strokeWidth={2} />
+            Products
+          </button>
+        </div>
+      </div>
+      <StateView
+        loading={loading}
+        empty={{
+          title: "No analytics yet",
+          text: "Once you start selling, your business analytics and earnings will appear here.",
+          actionLabel: "Add your first product",
+        }}
+        error={{
+          title: "Couldn't load your dashboard",
+          text: "Something went wrong while loading your analytics. Please try again.",
+        }}
+      >
+        {defaultView}
+      </StateView>
+    </StateProvider>
   );
 }

@@ -22,6 +22,7 @@ const CRUMB_LABELS: Record<string, string> = {
   "sub-sub-categories": "Sub Sub Categories",
   approval: "Vendor Approval",
   add: "Add New Vendor",
+  profile: "Profile",
   products: "Products",
   orders: "Orders",
   customers: "Customers",
@@ -79,6 +80,8 @@ export function SellerShell({
   nav = vendorNav,
   showRail = true,
   badges,
+  profileHref,
+  changePasswordHref,
   children,
 }: {
   variant: "vendor" | "admin";
@@ -93,6 +96,9 @@ export function SellerShell({
   showRail?: boolean;
   /** Optional count badge per nav-item label (e.g. { "Vendor Manage": 3 }). Shown when > 0. */
   badges?: Record<string, number>;
+  /** Header profile-dropdown links. When unset, the item is a no-op placeholder. */
+  profileHref?: string;
+  changePasswordHref?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -160,7 +166,7 @@ export function SellerShell({
             <span className="flex h-[34px] w-[34px] items-center justify-center rounded-md bg-iris-50 text-iris-500">
               <Icon name="house" size={18} strokeWidth={2} />
             </span>
-            <span className="font-display text-[16px] font-bold text-ink">Home</span>
+            <span className="font-display text-[16px] font-bold text-ink">Dashboard</span>
           </div>
           {nav.map((section) => (
             <div key={section.label} className="mb-4 last:mb-0">
@@ -391,20 +397,20 @@ export function SellerShell({
                       <div className="mt-1 truncate font-sans text-[11px] text-muted-soft">{userEmail}</div>
                     </div>
                   </div>
-                  <a
-                    href="#"
+                  <Link
+                    href={profileHref ?? "#"}
                     className="flex items-center gap-3 rounded-md px-3.5 py-2.5 font-sans text-[13.5px] font-medium text-ink-soft hover:bg-iris-50 hover:text-iris-500"
                   >
                     <Icon name="user" size={17} />
                     Profile Setting
-                  </a>
-                  <a
-                    href="#"
+                  </Link>
+                  <Link
+                    href={changePasswordHref ?? "#"}
                     className="flex items-center gap-3 rounded-md px-3.5 py-2.5 font-sans text-[13.5px] font-medium text-ink-soft hover:bg-iris-50 hover:text-iris-500"
                   >
                     <Icon name={variant === "admin" ? "settings" : "lock"} size={17} />
                     {variant === "admin" ? "Settings" : "Change Password"}
-                  </a>
+                  </Link>
                   <form action={signOutAction.bind(null, signOutTo)} className="mt-0.5 border-t border-line-soft pt-1.5">
                     <button
                       type="submit"
