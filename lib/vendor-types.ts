@@ -10,6 +10,7 @@ export type VendorListItem = {
   storeName: string;
   slug: string;
   status: VendorStatus;
+  logo: string | null;
   ownerName: string;
   email: string;
   createdAt: Date;
