@@ -50,8 +50,20 @@ model Vendor {
   storeName String
   slug      String       @unique
   status    VendorStatus @default(PENDING)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+
+  // Store/vendor profile (nullable — self-registered vendors don't set these;
+  // admin-created vendors do via the Add Vendor form). Images live under
+  // /public/uploads/vendors/.
+  image          String? // vendor/owner image
+  logo           String? // shop logo
+  coverImage     String? // shop cover image
+  address        String? // shop address
+  tinNumber      String? // taxpayer identification number
+  tinExpireDate  DateTime? // TIN expiry
+  tinCertificate String? // TIN certificate file path
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

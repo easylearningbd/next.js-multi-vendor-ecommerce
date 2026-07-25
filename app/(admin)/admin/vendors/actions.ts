@@ -1,9 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Prisma, VendorStatus } from "@prisma/client";
+import { Prisma, type VendorStatus } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { addVendorSchema } from "@/lib/vendor-validation";
+import {
+  saveVendorImage,
+  saveVendorCertificate,
+  deleteVendorFile,
+  FileValidationError,
+} from "@/lib/vendor-upload";
 import type {
   ActionResult,
   Paginated,
@@ -152,4 +160,129 @@ export async function approveVendor(id: string) {
 
 export async function suspendVendor(id: string) {
   return setStatus(id, "SUSPENDED");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Admin-created vendor (pre-approved). One transaction: User(VENDOR) + Vendor(APPROVED).
+// ─────────────────────────────────────────────────────────────
+
+function firstFieldErrors(flat: Record<string, string[] | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(flat)) if (v?.[0]) out[k] = v[0];
+  return out;
+}
+
+function slugify(input: string): string {
+  return (
+    input.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
+    "store"
+  );
+}
+
+async function uniqueVendorSlug(storeName: string): Promise<string> {
+  const base = slugify(storeName);
+  let slug = base;
+  let n = 1;
+  while (await prisma.vendor.findUnique({ where: { slug }, select: { id: true } })) {
+    slug = `${base}-${n++}`;
+  }
+  return slug;
+}
+
+export async function createVendorByAdmin(
+  _prev: ActionResult<{ vendorId: string }> | undefined,
+  formData: FormData,
+): Promise<ActionResult<{ vendorId: string }>> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const parsed = addVendorSchema.safeParse({
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+    storeName: formData.get("storeName"),
+    address: formData.get("address"),
+    image: formData.get("image"),
+    logo: formData.get("logo"),
+    coverImage: formData.get("coverImage"),
+    tinNumber: formData.get("tinNumber"),
+    tinExpireDate: formData.get("tinExpireDate"),
+    tinCertificate: formData.get("tinCertificate"),
+  });
+  if (!parsed.success) {
+    return { success: false, error: "Please fix the errors below.", fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors) };
+  }
+  const d = parsed.data;
+
+  // Reject a duplicate email early (friendly) before touching disk.
+  const existing = await prisma.user.findUnique({ where: { email: d.email }, select: { id: true } });
+  if (existing) {
+    return { success: false, fieldErrors: { email: "An account with this email already exists" }, error: "An account with this email already exists" };
+  }
+
+  // Save uploads (magic-byte validated). Track for rollback on failure.
+  const saved: string[] = [];
+  let imagePath: string, logoPath: string, coverPath: string;
+  let certPath: string | null = null;
+  try {
+    imagePath = await saveVendorImage(d.image);
+    saved.push(imagePath);
+    logoPath = await saveVendorImage(d.logo);
+    saved.push(logoPath);
+    coverPath = await saveVendorImage(d.coverImage);
+    saved.push(coverPath);
+    if (d.tinCertificate) {
+      certPath = await saveVendorCertificate(d.tinCertificate);
+      saved.push(certPath);
+    }
+  } catch (e) {
+    await Promise.all(saved.map(deleteVendorFile));
+    if (e instanceof FileValidationError) {
+      return { success: false, error: e.message };
+    }
+    return { success: false, error: "Could not process the uploaded files. Please try again." };
+  }
+
+  const name = `${d.firstName} ${d.lastName}`.trim();
+  const passwordHash = await bcrypt.hash(d.password, 12);
+  const tinExpire =
+    d.tinExpireDate && !Number.isNaN(new Date(d.tinExpireDate).getTime())
+      ? new Date(d.tinExpireDate)
+      : null;
+
+  try {
+    const slug = await uniqueVendorSlug(d.storeName);
+    const vendor = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name, email: d.email, passwordHash, phone: d.phone, role: "VENDOR" },
+      });
+      return tx.vendor.create({
+        data: {
+          userId: user.id,
+          storeName: d.storeName,
+          slug,
+          status: "APPROVED", // admin-created vendors are pre-approved
+          image: imagePath,
+          logo: logoPath,
+          coverImage: coverPath,
+          address: d.address,
+          tinNumber: d.tinNumber || null,
+          tinExpireDate: tinExpire,
+          tinCertificate: certPath,
+        },
+      });
+    });
+
+    revalidateVendor(vendor.id);
+    return { success: true, data: { vendorId: vendor.id } };
+  } catch (e) {
+    await Promise.all(saved.map(deleteVendorFile));
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { success: false, fieldErrors: { email: "An account with this email already exists" }, error: "An account with this email already exists" };
+    }
+    return { success: false, error: "Something went wrong creating the vendor. Please try again." };
+  }
 }
