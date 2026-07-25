@@ -20,6 +20,8 @@ const CRUMB_LABELS: Record<string, string> = {
   "sub-sub": "Sub Sub Categories",
   "sub-categories": "Sub Categories",
   "sub-sub-categories": "Sub Sub Categories",
+  approval: "Vendor Approval",
+  add: "Add New Vendor",
   products: "Products",
   orders: "Orders",
   customers: "Customers",
@@ -47,6 +49,24 @@ function deriveCrumbs(pathname: string): Crumb[] {
   return crumbs;
 }
 
+/**
+ * Which dropdown child is "active" for the current path. Exact match wins; failing
+ * that, the child whose href is the longest prefix wins — so e.g. /admin/vendors/[id]
+ * keeps "Vendor List" (/admin/vendors) highlighted, while /admin/vendors/approval
+ * still highlights only "Vendor Approval".
+ */
+function activeChildHref(children: { href: string }[], pathname: string): string | null {
+  const exact = children.find((c) => c.href === pathname);
+  if (exact) return exact.href;
+  let best: string | null = null;
+  for (const c of children) {
+    if (pathname.startsWith(`${c.href}/`) && (best === null || c.href.length > best.length)) {
+      best = c.href;
+    }
+  }
+  return best;
+}
+
 export function SellerShell({
   variant,
   userName,
@@ -58,6 +78,7 @@ export function SellerShell({
   breadcrumb,
   nav = vendorNav,
   showRail = true,
+  badges,
   children,
 }: {
   variant: "vendor" | "admin";
@@ -70,6 +91,8 @@ export function SellerShell({
   breadcrumb?: Crumb[];
   nav?: SellerNavSection[];
   showRail?: boolean;
+  /** Optional count badge per nav-item label (e.g. { "Vendor Manage": 3 }). Shown when > 0. */
+  badges?: Record<string, number>;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -146,13 +169,14 @@ export function SellerShell({
               </div>
               <div className="flex flex-col gap-[3px]">
                 {section.items.map((item) => {
-                  // ── Collapsible group (e.g. Category Setup) ──
+                  // ── Collapsible group (e.g. Category Setup, Vendor Manage) ──
                   if (item.children) {
-                    // Dropdown children are distinct leaf pages (e.g. /admin/categories
-                    // is a prefix of /admin/categories/sub) — use EXACT match so only one
-                    // highlights at a time.
-                    const childActive = item.children.some((c) => pathname === c.href);
+                    // Longest-match-wins so the active child is unambiguous even when
+                    // one href is a prefix of another (e.g. /admin/vendors vs /admin/vendors/add).
+                    const activeHref = activeChildHref(item.children, pathname);
+                    const childActive = activeHref !== null;
                     const isOpen = openGroups.has(item.label);
+                    const badge = badges?.[item.label] ?? 0;
                     return (
                       <div key={item.label}>
                         <button
@@ -169,19 +193,26 @@ export function SellerShell({
                             <Icon name={item.icon} size={17} />
                             {item.label}
                           </span>
-                          <Icon
-                            name="chevronDown"
-                            size={15}
-                            strokeWidth={2}
-                            className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${
-                              childActive ? "text-iris-500" : "text-muted-soft"
-                            }`}
-                          />
+                          <span className="flex items-center gap-2">
+                            {badge > 0 && (
+                              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-iris-100 px-1.5 font-sans text-[11px] font-semibold text-accent-fg">
+                                {badge}
+                              </span>
+                            )}
+                            <Icon
+                              name="chevronDown"
+                              size={15}
+                              strokeWidth={2}
+                              className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${
+                                childActive ? "text-iris-500" : "text-muted-soft"
+                              }`}
+                            />
+                          </span>
                         </button>
                         {isOpen && (
                           <div className="ml-[26px] mt-0.5 flex flex-col gap-0.5 border-l border-line-soft pl-3">
                             {item.children.map((child) => {
-                              const a = pathname === child.href;
+                              const a = child.href === activeHref;
                               return (
                                 <Link
                                   key={child.label}

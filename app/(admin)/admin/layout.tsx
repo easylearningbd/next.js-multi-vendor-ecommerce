@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/guard";
+import { prisma } from "@/lib/prisma";
 import { SellerShell } from "@/components/dashboard/SellerShell";
 import { adminNav } from "@/components/dashboard/navConfig";
 
@@ -13,6 +14,9 @@ export default async function AdminLayout({
   const session = await requireRole("ADMIN", "/admin/login");
   const user = session.user;
 
+  // Pending-vendor queue count → "Vendor Manage" sidebar badge.
+  const pendingVendors = await prisma.vendor.count({ where: { status: "PENDING" } });
+
   return (
     <SellerShell
       variant="admin"
@@ -24,6 +28,7 @@ export default async function AdminLayout({
       notifCount={12}
       nav={adminNav}
       showRail={false}
+      badges={{ "Vendor Manage": pendingVendors }}
     >
       {children}
     </SellerShell>

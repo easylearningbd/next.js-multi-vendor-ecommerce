@@ -41,6 +41,15 @@ export const adminNav: SellerNavSection[] = [
           { label: "Sub Sub Categories", href: "/admin/categories/sub-sub" },
         ],
       },
+      {
+        label: "Vendor Manage",
+        icon: "store",
+        children: [
+          { label: "Vendor Approval", href: "/admin/vendors/approval" },
+          { label: "Add New Vendor", href: "/admin/vendors/add" },
+          { label: "Vendor List", href: "/admin/vendors" },
+        ],
+      },
     ],
   },
 ];
