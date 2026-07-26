@@ -23,6 +23,7 @@ const CRUMB_LABELS: Record<string, string> = {
   approval: "Vendor Approval",
   add: "Add New Vendor",
   profile: "Profile",
+  "change-password": "Change Password",
   products: "Products",
   orders: "Orders",
   customers: "Customers",

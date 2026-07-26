@@ -24,6 +24,7 @@ export default async function VendorDashboardLayout({
       setupPercent={20}
       notifCount={1}
       profileHref="/vendor/profile"
+      changePasswordHref="/vendor/change-password"
     >
       {children}
     </SellerShell>
