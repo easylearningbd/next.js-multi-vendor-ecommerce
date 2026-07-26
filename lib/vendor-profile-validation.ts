@@ -11,13 +11,14 @@ export const ACCEPTED_CERT_MIME = ["application/pdf", ...ACCEPTED_IMAGE_MIME] as
 export const CERT_ACCEPT_ATTR = ACCEPTED_CERT_MIME.join(",");
 
 // ── Helpers ──
-// A cleared text input arrives as "" — treat that as "no value" (undefined) so the
-// action can null the column instead of storing an empty string.
+// A cleared text input arrives as "" (or an absent field as null) — treat either as
+// "no value" (undefined) so the action can null the column instead of storing "".
 const blankToUndefined = (v: unknown) =>
-  typeof v === "string" && v.trim() === "" ? undefined : v;
-// An unset file input arrives as a zero-byte File — treat that as "keep existing".
+  v == null || (typeof v === "string" && v.trim() === "") ? undefined : v;
+// An unset file input arrives as a zero-byte File (or absent as null) — treat either
+// as "keep existing".
 const emptyFileToUndefined = (v: unknown) =>
-  v instanceof File && v.size === 0 ? undefined : v;
+  v == null || (v instanceof File && v.size === 0) ? undefined : v;
 
 // ── Group A: User fields ──
 const nameSchema = z
@@ -71,23 +72,16 @@ const tinExpireDateSchema = z.preprocess(
   blankToUndefined,
   z
     .string()
-    .superRefine((v, ctx) => {
+    .refine((v) => !Number.isNaN(Date.parse(v)), "Enter a valid date")
+    .refine((v) => {
       const parsed = Date.parse(v);
-      if (Number.isNaN(parsed)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid date" });
-        return;
-      }
+      if (Number.isNaN(parsed)) return true; // handled by the previous refine
       const day = new Date(parsed);
       day.setHours(0, 0, 0, 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (day.getTime() < today.getTime()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Expiry date must be today or in the future",
-        });
-      }
-    })
+      return day.getTime() >= today.getTime();
+    }, "Expiry date must be today or in the future")
     .optional(),
 );
 

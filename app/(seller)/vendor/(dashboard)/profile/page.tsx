@@ -2,97 +2,157 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { StateProvider, StateTabs, StateView } from "@/components/dashboard/PreviewPanel";
 import { VendorProfileForm } from "@/components/dashboard/VendorProfileForm";
 import { Icon } from "@/components/dashboard/Icon";
 
 export const metadata: Metadata = { title: "Profile Information — Covet Seller" };
 
-export default async function VendorProfilePage() {
-  const session = await auth();
-  const user = session!.user;
-  // `phone` isn't carried on the session token — read it from the DB.
-  const record = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { name: true, email: true, phone: true },
-  });
-  const fullName = record?.name ?? user.name ?? "";
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  const firstName = parts[0] ?? "";
-  const lastName = parts.slice(1).join(" ");
+// Keep the page dynamic — it reflects the signed-in vendor's own data.
+export const dynamic = "force-dynamic";
 
-  const loading = (
-    <div className="rounded-[18px] border border-line-soft bg-surface p-[28px_30px] shadow-xs">
-      <div className="mb-6 h-40 animate-pulse rounded-2xl bg-line-soft" />
-      <div className="grid grid-cols-1 gap-x-6 gap-y-[22px] sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i}>
-            <div className="mb-2.5 h-3.5 w-2/5 animate-pulse rounded bg-line-soft" />
-            <div className="h-[50px] animate-pulse rounded-xl bg-line-soft" />
-          </div>
-        ))}
+function Header() {
+  return (
+    <div className="mb-[22px] flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[11px] bg-iris-50 text-iris-500">
+          <Icon name="user" size={20} strokeWidth={1.9} />
+        </span>
+        <h1 className="m-0 font-display text-[26px] font-extrabold leading-[1.1] tracking-[-0.01em] text-ink">
+          Profile Information
+        </h1>
       </div>
+      <Link
+        href="/vendor/dashboard"
+        className="flex h-11 items-center gap-2 rounded-md bg-iris-500 px-5 font-display text-[13px] font-bold text-white transition-colors hover:bg-iris-600"
+      >
+        <Icon name="home" size={17} strokeWidth={2} />
+        Dashboard
+      </Link>
     </div>
   );
+}
+
+function StateCard({
+  tone,
+  icon,
+  title,
+  text,
+}: {
+  tone: "empty" | "error";
+  icon: React.ComponentProps<typeof Icon>["name"];
+  title: string;
+  text: string;
+}) {
+  return (
+    <div
+      className={`flex flex-col items-center rounded-[18px] border bg-surface px-8 py-[72px] text-center ${
+        tone === "error" ? "border-[#f6d9da]" : "border-dashed border-line"
+      }`}
+    >
+      <span
+        className={`mb-[22px] flex h-[78px] w-[78px] items-center justify-center rounded-[22px] ${
+          tone === "error" ? "bg-error-bg text-error" : "bg-iris-50 text-iris-400"
+        }`}
+      >
+        <Icon name={icon} size={34} strokeWidth={1.7} />
+      </span>
+      <div className="font-display text-[20px] font-bold leading-[1.2] text-ink">{title}</div>
+      <p className="mx-auto mt-3 max-w-[360px] font-sans text-[14px] leading-[1.5] text-muted">{text}</p>
+    </div>
+  );
+}
+
+function certDisplayName(key: string): string {
+  const ext = key.includes(".") ? key.slice(key.lastIndexOf(".")) : "";
+  return `tin-certificate${ext.toLowerCase()}`;
+}
+
+export default async function VendorProfilePage() {
+  const session = await auth();
+  const userId = session!.user.id;
+
+  let record: {
+    name: string;
+    email: string;
+    phone: string | null;
+    vendor: {
+      storeName: string;
+      address: string | null;
+      tinNumber: string | null;
+      tinExpireDate: Date | null;
+      logo: string | null;
+      coverImage: string | null;
+      tinCertificate: string | null;
+    } | null;
+  } | null;
+
+  try {
+    record = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        name: true,
+        email: true,
+        phone: true,
+        vendor: {
+          select: {
+            storeName: true,
+            address: true,
+            tinNumber: true,
+            tinExpireDate: true,
+            logo: true,
+            coverImage: true,
+            tinCertificate: true,
+          },
+        },
+      },
+    });
+  } catch {
+    return (
+      <div>
+        <Header />
+        <StateCard
+          tone="error"
+          icon="alert"
+          title="Couldn't load your profile"
+          text="Something went wrong while loading your details. Please refresh and try again."
+        />
+      </div>
+    );
+  }
+
+  if (!record?.vendor) {
+    return (
+      <div>
+        <Header />
+        <StateCard
+          tone="empty"
+          icon="store"
+          title="Store profile not available"
+          text="We couldn't find a store linked to your account. Contact support if you believe this is an error."
+        />
+      </div>
+    );
+  }
+
+  const v = record.vendor;
+  const data = {
+    name: record.name ?? "",
+    email: record.email ?? "",
+    phone: record.phone ?? "",
+    storeName: v.storeName ?? "",
+    address: v.address ?? "",
+    tinNumber: v.tinNumber ?? "",
+    tinExpireDate: v.tinExpireDate ? v.tinExpireDate.toISOString().slice(0, 10) : "",
+    logo: v.logo,
+    coverImage: v.coverImage,
+    tinCertificateName: v.tinCertificate ? certDisplayName(v.tinCertificate) : null,
+    tinCertificateUrl: v.tinCertificate ? "/vendor/profile/tin" : null,
+  };
 
   return (
-    <StateProvider>
-      {/* Page header */}
-      <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[11px] bg-iris-50 text-iris-500">
-            <Icon name="user" size={20} strokeWidth={1.9} />
-          </span>
-          <h1 className="m-0 font-display text-[26px] font-extrabold leading-[1.1] tracking-[-0.01em] text-ink">
-            Profile Information
-          </h1>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <span className="hidden font-sans text-[12px] text-muted-soft sm:inline">Preview state</span>
-          <StateTabs trackClass="bg-[#EDECF1]" />
-          <Link
-            href="/vendor/dashboard"
-            className="flex h-11 items-center gap-2 rounded-md bg-iris-500 px-5 font-display text-[13px] font-bold text-white transition-colors hover:bg-iris-600"
-          >
-            <Icon name="home" size={17} strokeWidth={2} />
-            Dashboard
-          </Link>
-        </div>
-      </div>
-
-      {/* Sub-tabs: Basic Information (active) / Password */}
-      <div className="mb-[22px] flex items-center gap-3">
-        <span className="flex h-[46px] items-center gap-2.5 rounded-xl bg-iris-500 px-[22px] font-sans text-[14px] font-semibold text-white">
-          <Icon name="user" size={18} strokeWidth={2} />
-          Basic Information
-        </span>
-        <span
-          title="Coming soon"
-          className="flex h-[46px] cursor-default items-center gap-2.5 rounded-xl px-[22px] font-sans text-[14px] font-medium text-muted"
-        >
-          <Icon name="lock" size={18} strokeWidth={2} />
-          Password
-        </span>
-      </div>
-
-      <StateView
-        loading={loading}
-        empty={{
-          title: "Profile not available",
-          text: "Your details couldn't be found. Refresh to load your profile.",
-        }}
-        error={{
-          title: "Couldn't load your profile",
-          text: "Something went wrong. Please try again.",
-        }}
-      >
-        <VendorProfileForm
-          firstName={firstName}
-          lastName={lastName}
-          email={record?.email ?? user.email ?? ""}
-          phone={record?.phone ?? ""}
-        />
-      </StateView>
-    </StateProvider>
+    <div>
+      <Header />
+      <VendorProfileForm data={data} />
+    </div>
   );
 }
