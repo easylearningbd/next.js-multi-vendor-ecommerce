@@ -37,6 +37,10 @@ yarn-error.log*
 /public/uploads/*
 !/public/uploads/.gitkeep
 
+# private uploads — TIN certificates (tax documents). NEVER commit; never served
+# from /public. See lib/vendor-profile-upload.ts TODO(storage).
+/private-uploads/
+
 # vercel
 .vercel
 
