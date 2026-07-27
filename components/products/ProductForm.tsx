@@ -412,7 +412,9 @@ export function ProductForm({
               <p className="rounded-xl border border-iris-100 bg-iris-50 px-4 py-3 font-sans text-[12px] leading-[1.5] text-accent-fg">
                 Stock is managed per variation below.
               </p>
-              <input type="hidden" name="stock" value="0" />
+              {/* No stock input here on purpose: the server forces top-level stock to 0
+                  when variations exist, and defaults a missing value to 0. Rendering a
+                  hidden input would flip the stock field uncontrolled→controlled. */}
             </div>
           )}
         </div>

@@ -26,6 +26,7 @@
   --color-line: #ececf1;
   --color-line-soft: #f1f0f4;
   --color-surface: #ffffff;
+  --color-white: #ffffff;
   --color-bg: #fafafa;
   --color-bg-dash: #f4f3f7;
   --color-bg-subtle: #fbfafc;
@@ -93,12 +94,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-a {
-  color: var(--color-iris-500);
-  text-decoration: none;
-}
-a:hover {
-  color: var(--color-iris-600);
+/* Base-layer defaults so text-color utilities (e.g. text-white on button-styled
+   <Link>s) can override the default link color. Unlayered rules would otherwise win
+   over Tailwind v4 utilities. */
+@layer base {
+  a {
+    color: var(--color-iris-500);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--color-iris-600);
+  }
 }
 ::selection {
   background: var(--color-iris-100);
