@@ -27,6 +27,19 @@ enum BrandStatus {
   INACTIVE
 }
 
+// Admin-controlled review state. New vendor products start PENDING.
+enum ProductApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// A product's discount can be a flat amount or a percentage (design has both).
+enum ProductDiscountType {
+  AMOUNT
+  PERCENT
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -65,7 +78,8 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products Product[]
 }
 
 model Brand {
@@ -79,10 +93,9 @@ model Brand {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  // TODO(product): when the Product model is added, add the back-relation:
-  //   products Product[]
-  // and Product should carry `brandId String?` + `brand Brand? @relation(...)`.
-  // Until then, a brand's product count is 0 and delete is always allowed.
+  // A product's brand is optional; deleting a brand nulls Product.brandId
+  // (onDelete: SetNull on the Product side) rather than deleting products.
+  products Product[]
 }
 
 // ---- Category taxonomy: Category → SubCategory → SubSubCategory ----
@@ -100,8 +113,9 @@ model Category {
 
   subCategories    SubCategory[]
   subSubCategories SubSubCategory[]
-  // TODO(product): when the Product model exists, add `products Product[]` here and
-  // count via Prisma _count. Until then product counts are computed as 0.
+  // Product.categoryId is required → onDelete: Restrict on the Product side blocks
+  // deleting a category that still has products (never cascade-deletes products).
+  products         Product[]
 }
 
 model SubCategory {
@@ -114,7 +128,7 @@ model SubCategory {
 
   category         Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   subSubCategories SubSubCategory[]
-  // TODO(product): products Product[] (via Product.subCategoryId) — computed count only.
+  products         Product[]
 
   @@unique([categoryId, name])
   @@unique([categoryId, slug])
@@ -132,12 +146,96 @@ model SubSubCategory {
 
   category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   subCategory SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Restrict)
-  // TODO(product): products Product[] (via Product.subSubCategoryId) — computed count only.
+  products    Product[]
 
   @@unique([subCategoryId, name])
   @@unique([subCategoryId, slug])
   @@index([categoryId])
   @@index([subCategoryId])
+}
+
+// ---- Products ----
+// A product belongs to exactly one vendor (scope every query by vendorId).
+// TWO independent status fields:
+//   approvalStatus — admin review gate (PENDING by default for new vendor products)
+//   isActive       — the vendor's own show/hide toggle
+// A product is storefront-visible only when approvalStatus=APPROVED AND isActive=true.
+//
+// Money is ALWAYS Decimal(10,2), never Float (CLAUDE.md). taxRate is a percentage.
+// `gallery` is a JSON array of image paths and each variation's `attributes` is a JSON
+// map ({ Color: "Red", Size: "M" }): both are read/written wholesale with the product
+// and never filtered on independently, so JSON keeps it simple (no extra join tables).
+// If attribute-level faceted search is needed later, normalize then.
+
+model Product {
+  id       String @id @default(cuid())
+  vendorId String
+
+  // Taxonomy — category required; sub/sub-sub + brand optional. onDelete is chosen so
+  // deleting a brand/category NEVER cascade-deletes products (see relations below).
+  brandId          String?
+  categoryId       String
+  subCategoryId    String?
+  subSubCategoryId String?
+
+  name             String
+  slug             String  @unique
+  sku              String?
+  shortDescription String? @db.Text
+  description      String  @db.Text
+
+  // Pricing (all Decimal). discountType says whether `discount` is a flat amount or %.
+  price          Decimal             @db.Decimal(10, 2)
+  compareAtPrice Decimal?            @db.Decimal(10, 2)
+  discount       Decimal?            @db.Decimal(10, 2)
+  discountType   ProductDiscountType @default(AMOUNT)
+  taxRate        Decimal?            @db.Decimal(5, 2) // percentage
+
+  // Simple-product stock. IGNORED when the product has variations — then the sum of
+  // ProductVariation.stock is the source of truth.
+  stock Int @default(0)
+
+  thumbnail String?
+  gallery   Json? // string[] of image paths
+
+  metaTitle       String?
+  metaDescription String? @db.Text
+
+  approvalStatus ProductApprovalStatus @default(PENDING)
+  isActive       Boolean               @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor         Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  brand          Brand?             @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  category       Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory    SubCategory?       @relation(fields: [subCategoryId], references: [id], onDelete: Restrict)
+  subSubCategory SubSubCategory?    @relation(fields: [subSubCategoryId], references: [id], onDelete: Restrict)
+  variations     ProductVariation[]
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([approvalStatus])
+}
+
+// One row per attribute combination (e.g. "Red / M"), each with its own price + stock.
+model ProductVariation {
+  id         String   @id @default(cuid())
+  productId  String
+  name       String // human label, e.g. "Red / M"
+  sku        String?
+  price      Decimal  @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  image      String?
+  attributes Json // { Color: "Red", Size: "M" }
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 // ---- NextAuth adapter models (present so the Prisma adapter is satisfied;

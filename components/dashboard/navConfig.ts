@@ -18,6 +18,14 @@ export const vendorNav: SellerNavSection[] = [
     label: "Overview",
     items: [
       { label: "Dashboard", href: "/vendor/dashboard", icon: "dash" },
+      {
+        label: "Product Manage",
+        icon: "box",
+        children: [
+          { label: "Product List", href: "/vendor/products" },
+          { label: "Add Product", href: "/vendor/products/add" },
+        ],
+      },
       { label: "POS", href: "#", icon: "pos" },
     ],
   },
