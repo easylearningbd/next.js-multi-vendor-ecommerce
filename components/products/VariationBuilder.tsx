@@ -11,19 +11,23 @@ export type VariationRow = {
   price: string;
   stock: string;
   sku: string;
-  image: File | null;
-  preview: string | null;
+  image: File | null; // a newly-picked file (replaces existingImage)
+  preview: string | null; // object URL of a new file, or the existing image URL
+  id?: string; // existing variation id (edit mode)
+  existingImage?: string | null; // existing image URL (edit mode)
 };
 
 type Attribute = { id: string; name: string; values: string[] };
 
 let uid = 0;
 const nextId = () => `a${++uid}`;
-const sig = (attrs: Record<string, string>) =>
+/** Stable identity for an attribute combination (used to merge on re-generate). */
+export const variationKey = (attrs: Record<string, string>) =>
   Object.entries(attrs)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join("|");
+const sig = variationKey;
 
 // Cartesian product of the attributes' value lists → one combination per row.
 function combine(attrs: Attribute[]): Record<string, string>[] {

@@ -21,15 +21,21 @@ function FieldError({ message }: { message?: string }) {
 export function DependentCategorySelects({
   categories,
   errors,
+  initial,
+  initialSubs = [],
+  initialSubSubs = [],
 }: {
   categories: Option[];
   errors?: Record<string, string>;
+  initial?: { categoryId: string; subCategoryId: string; subSubCategoryId: string };
+  initialSubs?: Option[];
+  initialSubSubs?: Option[];
 }) {
-  const [categoryId, setCategoryId] = useState("");
-  const [subId, setSubId] = useState("");
-  const [subSubId, setSubSubId] = useState("");
-  const [subs, setSubs] = useState<Option[]>([]);
-  const [subSubs, setSubSubs] = useState<Option[]>([]);
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
+  const [subId, setSubId] = useState(initial?.subCategoryId ?? "");
+  const [subSubId, setSubSubId] = useState(initial?.subSubCategoryId ?? "");
+  const [subs, setSubs] = useState<Option[]>(initialSubs);
+  const [subSubs, setSubSubs] = useState<Option[]>(initialSubSubs);
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [loadingSubSubs, setLoadingSubSubs] = useState(false);
 

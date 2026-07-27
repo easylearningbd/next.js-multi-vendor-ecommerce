@@ -3,12 +3,12 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { createProduct } from "@/app/(seller)/vendor/(dashboard)/products/actions";
+import { createProduct, updateProduct } from "@/app/(seller)/vendor/(dashboard)/products/actions";
 import { IMAGE_ACCEPT_ATTR } from "@/lib/product-validation";
-import type { ActionResult, ProductFormOptions } from "@/lib/product-types";
+import type { ActionResult, ProductFormInitial, ProductFormOptions } from "@/lib/product-types";
 import { Icon } from "@/components/dashboard/Icon";
 import { DependentCategorySelects } from "./DependentCategorySelects";
-import { VariationBuilder, type VariationRow } from "./VariationBuilder";
+import { VariationBuilder, variationKey, type VariationRow } from "./VariationBuilder";
 
 const inputBase =
   "h-[46px] w-full rounded-xl border bg-bg-subtle px-3.5 font-sans text-[13.5px] text-ink outline-none transition focus:border-iris-500 focus:bg-surface focus:shadow-[0_0_0_3px_var(--color-iris-100)]";
@@ -33,33 +33,67 @@ function Card({ title, subtitle, children }: { title: string; subtitle: string; 
   );
 }
 
-export function AddProductForm({ options }: { options: ProductFormOptions }) {
+type State = ActionResult<{ id: string; approvalReset?: boolean }> | undefined;
+
+export function ProductForm({
+  options,
+  mode,
+  productId,
+  initial,
+}: {
+  options: ProductFormOptions;
+  mode: "create" | "edit";
+  productId?: string;
+  initial?: ProductFormInitial;
+}) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ActionResult<{ id: string }> | undefined, FormData>(
-    createProduct,
-    undefined,
-  );
+  const action = (
+    mode === "edit" && productId ? updateProduct.bind(null, productId) : createProduct
+  ) as (prev: State, fd: FormData) => Promise<State>;
+  const [state, formAction, pending] = useActionState<State, FormData>(action, undefined);
   const errors = state?.fieldErrors;
 
-  // Controlled bits the submit handler needs.
-  const [price, setPrice] = useState("");
-  const [hasVariations, setHasVariations] = useState(false);
-  const [rows, setRows] = useState<VariationRow[]>([]);
+  const [price, setPrice] = useState(initial?.price ?? "");
+  const [hasVariations, setHasVariations] = useState(initial?.hasVariations ?? false);
+  const [rows, setRows] = useState<VariationRow[]>(
+    () =>
+      initial?.variations.map((v) => ({
+        key: variationKey(v.attributes),
+        id: v.id,
+        name: v.name,
+        attributes: v.attributes,
+        price: v.price,
+        stock: v.stock,
+        sku: v.sku,
+        image: null,
+        preview: v.image,
+        existingImage: v.image,
+      })) ?? [],
+  );
+  const [existingGallery, setExistingGallery] = useState<string[]>(initial?.gallery ?? []);
   const [gallery, setGallery] = useState<{ file: File; preview: string }[]>([]);
-  const [thumbPreview, setThumbPreview] = useState<string | null>(null);
+  const [thumbPreview, setThumbPreview] = useState<string | null>(initial?.thumbnail ?? null);
+  const [thumbIsNew, setThumbIsNew] = useState(false);
   const thumbRef = useRef<HTMLInputElement>(null);
   const thumbUrl = useRef<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!state) return;
     if (state.success && state.data?.id) {
-      toast.success("Product created — pending admin approval.");
+      if (mode === "edit") {
+        toast.success(
+          state.data.approvalReset
+            ? "Product updated — sent back for admin review."
+            : "Product updated.",
+        );
+      } else {
+        toast.success("Product created — pending admin approval.");
+      }
       router.push("/vendor/products");
     } else if (state.error) {
       toast.error(state.error);
     }
-  }, [state, router]);
+  }, [state, router, mode]);
 
   function pickThumb(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -67,17 +101,24 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
     if (thumbUrl.current) URL.revokeObjectURL(thumbUrl.current);
     thumbUrl.current = URL.createObjectURL(f);
     setThumbPreview(thumbUrl.current);
+    setThumbIsNew(true);
   }
   function removeThumb() {
     if (thumbUrl.current) URL.revokeObjectURL(thumbUrl.current);
     thumbUrl.current = null;
     if (thumbRef.current) thumbRef.current.value = "";
-    setThumbPreview(null);
+    // In edit, "removing" a freshly-picked file reverts to the existing thumbnail.
+    if (mode === "edit" && initial?.thumbnail) {
+      setThumbPreview(initial.thumbnail);
+      setThumbIsNew(false);
+    } else {
+      setThumbPreview(null);
+      setThumbIsNew(false);
+    }
   }
   function addGallery(files: FileList | null) {
     if (!files) return;
-    const next = Array.from(files).map((file) => ({ file, preview: URL.createObjectURL(file) }));
-    setGallery((g) => [...g, ...next]);
+    setGallery((g) => [...g, ...Array.from(files).map((file) => ({ file, preview: URL.createObjectURL(file) }))]);
   }
   function removeGallery(idx: number) {
     setGallery((g) => {
@@ -88,12 +129,14 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget); // scalars + thumbnail (named inputs)
+    const fd = new FormData(e.currentTarget);
 
-    // Client guards for instant feedback (server re-validates authoritatively).
-    if (!(fd.get("thumbnail") instanceof File) || (fd.get("thumbnail") as File).size === 0) {
-      toast.error("Please upload a product thumbnail.");
-      return;
+    if (mode === "create") {
+      const t = fd.get("thumbnail");
+      if (!(t instanceof File) || t.size === 0) {
+        toast.error("Please upload a product thumbnail.");
+        return;
+      }
     }
     if (!fd.get("categoryId")) {
       toast.error("Please choose a category.");
@@ -104,21 +147,22 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
       return;
     }
 
-    // Gallery files (state-managed).
+    fd.set("keptGallery", JSON.stringify(existingGallery));
     gallery.forEach((g) => fd.append("gallery", g.file));
 
-    // Variations → JSON + per-row image files.
     fd.set("hasVariations", hasVariations ? "true" : "false");
     fd.set(
       "variations",
       JSON.stringify(
         rows.map((r, i) => ({
+          id: r.id ?? null,
           name: r.name,
           attributes: r.attributes,
           price: r.price,
           stock: r.stock,
           sku: r.sku,
           imageIndex: r.image ? i : -1,
+          keepImage: !r.image && !!r.existingImage,
         })),
       ),
     );
@@ -131,9 +175,10 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
 
   const dropZone =
     "flex min-h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-[#d6d4dd] bg-bg-subtle p-5 text-center transition-colors hover:border-iris-500";
+  const showThumbRemove = mode === "create" ? !!thumbPreview : thumbIsNew;
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="flex flex-col gap-[22px]">
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-[22px]">
       {/* Basic Setup */}
       <Card title="Basic Setup" subtitle="Set up the core product information shown on the website.">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
@@ -145,6 +190,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
               <input
                 id="name"
                 name="name"
+                defaultValue={initial?.name}
                 placeholder="New product"
                 aria-invalid={!!errors?.name}
                 className={`${inputBase} ${errors?.name ? "border-error" : "border-line"}`}
@@ -158,6 +204,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
               <input
                 id="shortDescription"
                 name="shortDescription"
+                defaultValue={initial?.shortDescription}
                 placeholder="One-line summary (optional)"
                 className={`${inputBase} border-line`}
               />
@@ -170,6 +217,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
               <textarea
                 id="description"
                 name="description"
+                defaultValue={initial?.description}
                 placeholder="Describe your product…"
                 aria-invalid={!!errors?.description}
                 className={`min-h-[150px] w-full resize-y rounded-xl border bg-bg-subtle px-3.5 py-3 font-sans text-[13.5px] leading-[1.5] text-ink outline-none transition focus:border-iris-500 focus:bg-surface focus:shadow-[0_0_0_3px_var(--color-iris-100)] ${
@@ -199,13 +247,15 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
                   >
                     Replace
                   </button>
-                  <button
-                    type="button"
-                    onClick={removeThumb}
-                    className="rounded-md border border-error-bg bg-error-bg px-2.5 py-1 font-sans text-[11px] font-semibold text-error"
-                  >
-                    Remove
-                  </button>
+                  {showThumbRemove && (
+                    <button
+                      type="button"
+                      onClick={removeThumb}
+                      className="rounded-md border border-error-bg bg-error-bg px-2.5 py-1 font-sans text-[11px] font-semibold text-error"
+                    >
+                      {mode === "edit" ? "Undo" : "Remove"}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -223,12 +273,26 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
       {/* General Setup */}
       <Card title="General Setup" subtitle="Foundational details required for product creation.">
         <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-          <DependentCategorySelects categories={options.categories} errors={errors} />
+          <DependentCategorySelects
+            categories={options.categories}
+            errors={errors}
+            initial={
+              initial
+                ? {
+                    categoryId: initial.categoryId,
+                    subCategoryId: initial.subCategoryId,
+                    subSubCategoryId: initial.subSubCategoryId,
+                  }
+                : undefined
+            }
+            initialSubs={initial?.subOptions}
+            initialSubSubs={initial?.subSubOptions}
+          />
           <div>
             <label htmlFor="brandId" className={labelClass}>
               Brand
             </label>
-            <select id="brandId" name="brandId" className={`${inputBase} border-line`}>
+            <select id="brandId" name="brandId" defaultValue={initial?.brandId ?? ""} className={`${inputBase} border-line`}>
               <option value="">Select brand</option>
               {options.brands.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -242,7 +306,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
             <label htmlFor="sku" className={labelClass}>
               Product SKU
             </label>
-            <input id="sku" name="sku" placeholder="e.g. ABC-123" className={`${inputBase} border-line`} />
+            <input id="sku" name="sku" defaultValue={initial?.sku} placeholder="e.g. ABC-123" className={`${inputBase} border-line`} />
             <FieldError message={errors?.sku} />
           </div>
         </div>
@@ -279,6 +343,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
               type="number"
               step="0.01"
               min="0"
+              defaultValue={initial?.compareAtPrice}
               placeholder="0.00"
               aria-invalid={!!errors?.compareAtPrice}
               className={`${inputBase} ${errors?.compareAtPrice ? "border-error" : "border-line"}`}
@@ -296,10 +361,11 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
                 type="number"
                 step="0.01"
                 min="0"
+                defaultValue={initial?.discount}
                 placeholder="0"
                 className={`${inputBase} border-line`}
               />
-              <select name="discountType" className={`${inputBase} w-[120px] border-line`} defaultValue="AMOUNT">
+              <select name="discountType" defaultValue={initial?.discountType ?? "AMOUNT"} className={`${inputBase} w-[120px] border-line`}>
                 <option value="AMOUNT">Flat</option>
                 <option value="PERCENT">Percent</option>
               </select>
@@ -317,6 +383,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
               step="0.01"
               min="0"
               max="100"
+              defaultValue={initial?.taxRate}
               placeholder="0"
               aria-invalid={!!errors?.taxRate}
               className={`${inputBase} ${errors?.taxRate ? "border-error" : "border-line"}`}
@@ -334,7 +401,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
                 type="number"
                 step="1"
                 min="0"
-                defaultValue="0"
+                defaultValue={initial?.stock ?? "0"}
                 aria-invalid={!!errors?.stock}
                 className={`${inputBase} ${errors?.stock ? "border-error" : "border-line"}`}
               />
@@ -345,7 +412,6 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
               <p className="rounded-xl border border-iris-100 bg-iris-50 px-4 py-3 font-sans text-[12px] leading-[1.5] text-accent-fg">
                 Stock is managed per variation below.
               </p>
-              {/* keep the field submitted (ignored server-side when variations exist) */}
               <input type="hidden" name="stock" value="0" />
             </div>
           )}
@@ -367,6 +433,20 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
       {/* Gallery */}
       <Card title="Product Additional Images" subtitle="Upload extra images for this product (optional).">
         <div className="flex flex-wrap gap-3.5">
+          {existingGallery.map((url, i) => (
+            <div key={url} className="relative h-[110px] w-[110px] overflow-hidden rounded-xl border border-line">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setExistingGallery((g) => g.filter((_, idx) => idx !== i))}
+                aria-label="Remove image"
+                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-error-bg text-error"
+              >
+                <Icon name="x" size={12} strokeWidth={2.4} />
+              </button>
+            </div>
+          ))}
           {gallery.map((g, i) => (
             <div key={i} className="relative h-[110px] w-[110px] overflow-hidden rounded-xl border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -396,7 +476,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
             <label htmlFor="metaTitle" className={labelClass}>
               Meta Title
             </label>
-            <input id="metaTitle" name="metaTitle" placeholder="Meta title" className={`${inputBase} border-line`} />
+            <input id="metaTitle" name="metaTitle" defaultValue={initial?.metaTitle} placeholder="Meta title" className={`${inputBase} border-line`} />
             <FieldError message={errors?.metaTitle} />
           </div>
           <div>
@@ -406,6 +486,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
             <textarea
               id="metaDescription"
               name="metaDescription"
+              defaultValue={initial?.metaDescription}
               placeholder="Meta description"
               className="min-h-[100px] w-full resize-y rounded-xl border border-line bg-bg-subtle px-3.5 py-3 font-sans text-[13.5px] leading-[1.5] text-ink outline-none transition focus:border-iris-500 focus:bg-surface focus:shadow-[0_0_0_3px_var(--color-iris-100)]"
             />
@@ -429,7 +510,7 @@ export function AddProductForm({ options }: { options: ProductFormOptions }) {
           className="flex h-12 items-center justify-center gap-2 rounded-xl bg-iris-500 px-9 font-display text-[14px] font-bold text-white transition-colors hover:bg-iris-600 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {pending && <span className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-          {pending ? "Saving…" : "Submit product"}
+          {pending ? "Saving…" : mode === "edit" ? "Save changes" : "Submit product"}
         </button>
       </div>
     </form>

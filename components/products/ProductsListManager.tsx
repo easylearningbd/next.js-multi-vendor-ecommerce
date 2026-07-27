@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ProductListItem } from "@/lib/product-types";
@@ -8,6 +9,7 @@ import { BrandsPagination } from "@/components/brands/BrandsPagination";
 import { ProductApprovalBadge } from "./ProductApprovalBadge";
 import { ProductActiveToggle } from "./ProductActiveToggle";
 import { ProductsToolbar } from "./ProductsToolbar";
+import { DeleteProductModal } from "./DeleteProductModal";
 
 const GRID =
   "grid-cols-[46px_minmax(220px,1.6fr)_minmax(120px,1fr)_100px_84px_116px_72px_120px]";
@@ -30,6 +32,7 @@ export function ProductsListManager({
   errored: boolean;
 }) {
   const router = useRouter();
+  const [toDelete, setToDelete] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <>
@@ -179,13 +182,11 @@ export function ProductsListManager({
                       >
                         <Icon name="edit" size={15} strokeWidth={2} />
                       </Link>
-                      {/* TODO(part5): wire the order-aware delete modal + deleteProduct action. */}
                       <button
                         type="button"
+                        onClick={() => setToDelete({ id: p.id, name: p.name })}
                         aria-label={`Delete ${p.name}`}
-                        disabled
-                        title="Delete arrives in the next step"
-                        className="flex h-8 w-8 items-center justify-center rounded-md border border-error-bg bg-error-bg text-error opacity-50"
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-error-bg bg-error-bg text-error transition-[filter] hover:brightness-95"
                       >
                         <Icon name="trash" size={15} strokeWidth={2} />
                       </button>
@@ -199,6 +200,8 @@ export function ProductsListManager({
           </>
         )}
       </div>
+
+      <DeleteProductModal product={toDelete} onClose={() => setToDelete(null)} />
     </>
   );
 }

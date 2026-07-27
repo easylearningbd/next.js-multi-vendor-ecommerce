@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Icon } from "@/components/dashboard/Icon";
-import { AddProductForm } from "@/components/products/AddProductForm";
+import { ProductForm } from "@/components/products/ProductForm";
 import { getProductFormOptions } from "../actions";
 
 export const metadata: Metadata = { title: "Add New Product — Covet Seller" };
@@ -39,7 +39,7 @@ export default async function AddProductPage() {
   return (
     <div>
       <Header />
-      <AddProductForm options={res.data} />
+      <ProductForm options={res.data} mode="create" />
     </div>
   );
 }

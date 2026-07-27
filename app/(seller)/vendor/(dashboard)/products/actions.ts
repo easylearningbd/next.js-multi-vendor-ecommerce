@@ -10,6 +10,8 @@ import type {
   ActionResult,
   Option,
   Paginated,
+  ProductDetail,
+  ProductFormInitial,
   ProductFormOptions,
   ProductListItem,
   ProductsQuery,
@@ -378,4 +380,382 @@ export async function createProduct(
     }
     return { success: false, error: "Something went wrong creating the product. Please try again." };
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Load a vendor's OWN product for editing (session-scoped → 404 for other vendors).
+// ─────────────────────────────────────────────────────────────
+export async function getProductForEdit(id: string): Promise<ActionResult<ProductFormInitial>> {
+  const authed = await requireVendor();
+  if ("error" in authed) return { success: false, error: authed.error };
+
+  const p = await prisma.product.findFirst({
+    where: { id, vendorId: authed.vendorId },
+    include: { variations: { orderBy: { createdAt: "asc" } } },
+  });
+  if (!p) return { success: false, error: "Product not found." };
+
+  const [subOptions, subSubOptions] = await Promise.all([
+    p.categoryId
+      ? prisma.subCategory.findMany({ where: { categoryId: p.categoryId }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    p.subCategoryId
+      ? prisma.subSubCategory.findMany({ where: { subCategoryId: p.subCategoryId }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    success: true,
+    data: {
+      id: p.id,
+      name: p.name,
+      shortDescription: p.shortDescription ?? "",
+      description: p.description,
+      sku: p.sku ?? "",
+      categoryId: p.categoryId,
+      subCategoryId: p.subCategoryId ?? "",
+      subSubCategoryId: p.subSubCategoryId ?? "",
+      brandId: p.brandId ?? "",
+      price: p.price.toString(),
+      compareAtPrice: p.compareAtPrice?.toString() ?? "",
+      discount: p.discount?.toString() ?? "",
+      discountType: p.discountType,
+      taxRate: p.taxRate?.toString() ?? "",
+      stock: String(p.stock),
+      metaTitle: p.metaTitle ?? "",
+      metaDescription: p.metaDescription ?? "",
+      thumbnail: p.thumbnail,
+      gallery: (p.gallery as string[] | null) ?? [],
+      hasVariations: p.variations.length > 0,
+      variations: p.variations.map((v) => ({
+        id: v.id,
+        name: v.name,
+        attributes: (v.attributes as Record<string, string>) ?? {},
+        price: v.price.toString(),
+        stock: String(v.stock),
+        sku: v.sku ?? "",
+        image: v.image,
+      })),
+      subOptions,
+      subSubOptions,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Update — session-scoped, one transaction. Diffs variations (add/update/remove),
+// replaces images cleanly, and RESETS approvalStatus→PENDING when a critical field
+// (name, price, description, category) changed, so admins re-review material edits.
+// ─────────────────────────────────────────────────────────────
+type RawVariation = { id?: string | null; imageIndex?: number; keepImage?: boolean };
+
+export async function updateProduct(
+  id: string,
+  _prev: ActionResult<{ id: string; approvalReset: boolean }> | undefined,
+  formData: FormData,
+): Promise<ActionResult<{ id: string; approvalReset: boolean }>> {
+  const authed = await requireVendor();
+  if ("error" in authed) return { success: false, error: authed.error };
+
+  const existing = await prisma.product.findFirst({
+    where: { id, vendorId: authed.vendorId }, // session-scoped
+    include: { variations: true },
+  });
+  if (!existing) return { success: false, error: "Product not found." };
+
+  let variationsRaw: unknown = [];
+  try {
+    variationsRaw = JSON.parse((formData.get("variations") as string) || "[]");
+  } catch {
+    return { success: false, error: "Invalid variation data." };
+  }
+
+  const parsed = productCoreSchema.safeParse({
+    name: formData.get("name"),
+    shortDescription: formData.get("shortDescription"),
+    description: formData.get("description"),
+    sku: formData.get("sku"),
+    categoryId: formData.get("categoryId"),
+    subCategoryId: formData.get("subCategoryId"),
+    subSubCategoryId: formData.get("subSubCategoryId"),
+    brandId: formData.get("brandId"),
+    price: formData.get("price"),
+    compareAtPrice: formData.get("compareAtPrice"),
+    discount: formData.get("discount"),
+    discountType: formData.get("discountType") || "AMOUNT",
+    taxRate: formData.get("taxRate"),
+    stock: formData.get("stock") ?? 0,
+    metaTitle: formData.get("metaTitle"),
+    metaDescription: formData.get("metaDescription"),
+    hasVariations: formData.get("hasVariations") === "true",
+    variations: variationsRaw,
+  });
+  if (!parsed.success) {
+    return { success: false, error: "Please fix the errors below.", fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors) };
+  }
+  const d = parsed.data;
+  const rawAll = Array.isArray(variationsRaw) ? (variationsRaw as RawVariation[]) : [];
+
+  // Same taxonomy/brand integrity checks as create.
+  const category = await prisma.category.findUnique({ where: { id: d.categoryId }, select: { id: true } });
+  if (!category) return { success: false, error: "Please choose a valid category.", fieldErrors: { categoryId: "Choose a valid category" } };
+  if (d.subCategoryId) {
+    const sc = await prisma.subCategory.findFirst({ where: { id: d.subCategoryId, categoryId: d.categoryId }, select: { id: true } });
+    if (!sc) return { success: false, error: "That sub-category doesn't belong to the category.", fieldErrors: { subCategoryId: "Invalid sub-category" } };
+  }
+  if (d.subSubCategoryId) {
+    const ssc = await prisma.subSubCategory.findFirst({ where: { id: d.subSubCategoryId, subCategoryId: d.subCategoryId || undefined }, select: { id: true } });
+    if (!ssc) return { success: false, error: "That sub-sub-category doesn't belong to the sub-category.", fieldErrors: { subSubCategoryId: "Invalid sub-sub-category" } };
+  }
+  if (d.brandId) {
+    const b = await prisma.brand.findUnique({ where: { id: d.brandId }, select: { id: true } });
+    if (!b) return { success: false, error: "Please choose a valid brand.", fieldErrors: { brandId: "Invalid brand" } };
+  }
+
+  // Variations to keep (ignored entirely if the vendor turned variations off).
+  const vlist = d.hasVariations ? d.variations : [];
+  const rlist = d.hasVariations ? rawAll : [];
+
+  // Save any NEW files first (rollback on later failure).
+  const savedNew: string[] = [];
+  let newThumb: string | undefined;
+  const newGalleryPaths: string[] = [];
+  const variationImage: (string | null)[] = vlist.map(() => null);
+  try {
+    const thumbFile = formData.get("thumbnail");
+    if (thumbFile instanceof File && thumbFile.size > 0) {
+      newThumb = await saveProductImage(thumbFile);
+      savedNew.push(newThumb);
+    }
+    for (const g of formData.getAll("gallery")) {
+      if (g instanceof File && g.size > 0) {
+        const p = await saveProductImage(g);
+        savedNew.push(p);
+        newGalleryPaths.push(p);
+      }
+    }
+    for (let i = 0; i < vlist.length; i++) {
+      const rv = rlist[i] ?? {};
+      if (typeof rv.imageIndex === "number" && rv.imageIndex >= 0) {
+        const vf = formData.get(`varImage_${rv.imageIndex}`);
+        if (vf instanceof File && vf.size > 0) {
+          const p = await saveProductImage(vf);
+          savedNew.push(p);
+          variationImage[i] = p;
+          continue;
+        }
+      }
+      if (rv.keepImage && rv.id) {
+        variationImage[i] = existing.variations.find((v) => v.id === rv.id)?.image ?? null;
+      }
+    }
+  } catch (e) {
+    await Promise.all(savedNew.map(deleteProductFile));
+    if (e instanceof FileValidationError) return { success: false, error: e.message };
+    return { success: false, error: "Could not process the uploaded images. Please try again." };
+  }
+
+  // Gallery: kept existing URLs + newly uploaded ones; removed ones deleted after commit.
+  let keptGallery: string[] = [];
+  try {
+    keptGallery = JSON.parse((formData.get("keptGallery") as string) || "[]");
+  } catch {
+    keptGallery = [];
+  }
+  const existingGallery = (existing.gallery as string[] | null) ?? [];
+  keptGallery = keptGallery.filter((g) => existingGallery.includes(g));
+  const finalGallery = [...keptGallery, ...newGalleryPaths];
+  const removedGallery = existingGallery.filter((g) => !keptGallery.includes(g));
+
+  // Variation diff: existing rows whose id isn't resubmitted are deleted.
+  const submittedIds = new Set(rlist.map((r) => r.id).filter(Boolean) as string[]);
+  const toDeleteVars = existing.variations.filter((v) => !submittedIds.has(v.id));
+
+  // Re-review trigger.
+  const criticalChanged =
+    existing.name !== d.name ||
+    existing.description !== d.description ||
+    existing.categoryId !== d.categoryId ||
+    existing.price.toString() !== dec(d.price).toString();
+  const approvalStatus = criticalChanged ? "PENDING" : existing.approvalStatus;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (toDeleteVars.length) {
+        await tx.productVariation.deleteMany({ where: { id: { in: toDeleteVars.map((v) => v.id) } } });
+      }
+      await tx.product.update({
+        where: { id },
+        data: {
+          name: d.name,
+          sku: d.sku || null,
+          shortDescription: d.shortDescription || null,
+          description: d.description,
+          categoryId: d.categoryId,
+          subCategoryId: d.subCategoryId || null,
+          subSubCategoryId: d.subSubCategoryId || null,
+          brandId: d.brandId || null,
+          price: dec(d.price),
+          compareAtPrice: d.compareAtPrice != null ? dec(d.compareAtPrice) : null,
+          discount: d.discount != null ? dec(d.discount) : null,
+          discountType: d.discountType,
+          taxRate: d.taxRate != null ? new Prisma.Decimal(d.taxRate.toFixed(2)) : null,
+          stock: d.hasVariations ? 0 : d.stock,
+          gallery: finalGallery,
+          metaTitle: d.metaTitle || null,
+          metaDescription: d.metaDescription || null,
+          approvalStatus,
+          ...(newThumb ? { thumbnail: newThumb } : {}),
+        },
+      });
+      for (let i = 0; i < vlist.length; i++) {
+        const v = vlist[i];
+        const rv = rlist[i] ?? {};
+        const data = {
+          name: v.name,
+          sku: v.sku || null,
+          price: dec(v.price),
+          stock: v.stock,
+          image: variationImage[i],
+          attributes: v.attributes,
+        };
+        if (rv.id && existing.variations.some((e) => e.id === rv.id)) {
+          await tx.productVariation.update({ where: { id: rv.id }, data });
+        } else {
+          await tx.productVariation.create({ data: { ...data, productId: id } });
+        }
+      }
+    });
+
+    // Post-commit file cleanup: replaced thumbnail, removed gallery, deleted variations,
+    // and variation images that were replaced by a new upload.
+    const stale: (string | null)[] = [];
+    if (newThumb) stale.push(existing.thumbnail);
+    removedGallery.forEach((g) => stale.push(g));
+    toDeleteVars.forEach((v) => stale.push(v.image));
+    for (let i = 0; i < vlist.length; i++) {
+      const rv = rlist[i] ?? {};
+      if (rv.id) {
+        const ex = existing.variations.find((v) => v.id === rv.id);
+        if (ex?.image && ex.image !== variationImage[i]) stale.push(ex.image);
+      }
+    }
+    await Promise.all(stale.map(deleteProductFile));
+
+    revalidatePath("/vendor/products");
+    revalidatePath(`/vendor/products/${id}`);
+    return { success: true, data: { id, approvalReset: criticalChanged } };
+  } catch (e) {
+    await Promise.all(savedNew.map(deleteProductFile));
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { success: false, error: "A product with a similar name already exists." };
+    }
+    return { success: false, error: "Couldn't save the product. Please try again." };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Delete — session-scoped. If the product is referenced by orders we must NOT orphan
+// order history, so we DEACTIVATE (isActive=false) instead of hard-deleting. Otherwise
+// hard-delete (variations cascade) and remove the image files from disk.
+//
+// TODO(order): there is no Order model yet, so `orderCount` is always 0 and delete is
+// always a hard delete. When Orders land, count OrderItem rows referencing this product
+// here — the soft-delete branch below is already wired.
+// ─────────────────────────────────────────────────────────────
+export async function deleteProduct(
+  id: string,
+): Promise<ActionResult<{ softDeleted: boolean }>> {
+  const authed = await requireVendor();
+  if ("error" in authed) return { success: false, error: authed.error };
+
+  const product = await prisma.product.findFirst({
+    where: { id, vendorId: authed.vendorId }, // session-scoped
+    include: { variations: { select: { image: true } } },
+  });
+  if (!product) return { success: false, error: "Product not found." };
+
+  const orderCount = 0; // TODO(order): count order references once an Order model exists.
+
+  try {
+    if (orderCount > 0) {
+      // Preserve order history: deactivate rather than delete.
+      await prisma.product.update({ where: { id }, data: { isActive: false } });
+      revalidatePath("/vendor/products");
+      return { success: true, data: { softDeleted: true } };
+    }
+
+    const files = [product.thumbnail, ...((product.gallery as string[] | null) ?? []), ...product.variations.map((v) => v.image)];
+    await prisma.product.delete({ where: { id } }); // variations cascade
+    await Promise.all(files.map(deleteProductFile));
+
+    revalidatePath("/vendor/products");
+    return { success: true, data: { softDeleted: false } };
+  } catch {
+    return { success: false, error: "Couldn't delete the product. Please try again." };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Full product for the details view — session-scoped (→ 404 for other vendors).
+// ─────────────────────────────────────────────────────────────
+export async function getProductDetail(id: string): Promise<ActionResult<ProductDetail>> {
+  const authed = await requireVendor();
+  if ("error" in authed) return { success: false, error: authed.error };
+
+  const p = await prisma.product.findFirst({
+    where: { id, vendorId: authed.vendorId }, // session-scoped
+    include: {
+      brand: { select: { name: true } },
+      category: { select: { name: true } },
+      subCategory: { select: { name: true } },
+      subSubCategory: { select: { name: true } },
+      variations: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!p) return { success: false, error: "Product not found." };
+
+  const hasVariations = p.variations.length > 0;
+  const totalStock = hasVariations ? p.variations.reduce((s, v) => s + v.stock, 0) : p.stock;
+
+  return {
+    success: true,
+    data: {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      sku: p.sku,
+      description: p.description,
+      shortDescription: p.shortDescription,
+      brandName: p.brand?.name ?? null,
+      categoryName: p.category.name,
+      subCategoryName: p.subCategory?.name ?? null,
+      subSubCategoryName: p.subSubCategory?.name ?? null,
+      price: p.price.toString(),
+      compareAtPrice: p.compareAtPrice?.toString() ?? null,
+      discount: p.discount?.toString() ?? null,
+      discountType: p.discountType,
+      taxRate: p.taxRate?.toString() ?? null,
+      stock: p.stock,
+      thumbnail: p.thumbnail,
+      gallery: (p.gallery as string[] | null) ?? [],
+      metaTitle: p.metaTitle,
+      metaDescription: p.metaDescription,
+      approvalStatus: p.approvalStatus,
+      isActive: p.isActive,
+      hasVariations,
+      variations: p.variations.map((v) => ({
+        id: v.id,
+        name: v.name,
+        attributes: (v.attributes as Record<string, string>) ?? {},
+        price: v.price.toString(),
+        stock: v.stock,
+        sku: v.sku,
+        image: v.image,
+      })),
+      totalStock,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    },
+  };
 }
