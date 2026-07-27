@@ -21,7 +21,7 @@ const CRUMB_LABELS: Record<string, string> = {
   "sub-categories": "Sub Categories",
   "sub-sub-categories": "Sub Sub Categories",
   approval: "Vendor Approval",
-  add: "Add New Vendor",
+  add: "Add New",
   profile: "Profile",
   "change-password": "Change Password",
   products: "Products",
