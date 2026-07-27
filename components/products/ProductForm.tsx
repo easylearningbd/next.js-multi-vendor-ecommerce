@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { createProduct, updateProduct } from "@/app/(seller)/vendor/(dashboard)/products/actions";
@@ -170,7 +170,8 @@ export function ProductForm({
       if (r.image) fd.append(`varImage_${i}`, r.image);
     });
 
-    formAction(fd);
+    // useActionState's dispatch must run inside a transition (keeps `pending` correct).
+    startTransition(() => formAction(fd));
   }
 
   const dropZone =

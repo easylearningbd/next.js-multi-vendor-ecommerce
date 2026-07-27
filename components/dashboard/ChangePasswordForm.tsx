@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { changeVendorPassword } from "@/app/(seller)/vendor/(dashboard)/change-password/actions";
 import { changePasswordSchema } from "@/lib/change-password-validation";
@@ -107,7 +107,8 @@ export function ChangePasswordForm() {
       return;
     }
     setClientErrors({});
-    formAction(fd);
+    // useActionState's dispatch must run inside a transition (keeps `pending` correct).
+    startTransition(() => formAction(fd));
   }
 
   return (
