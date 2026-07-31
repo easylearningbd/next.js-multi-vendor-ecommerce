@@ -26,6 +26,14 @@ export const vendorNav: SellerNavSection[] = [
           { label: "Add Product", href: "/vendor/products/add" },
         ],
       },
+      {
+        label: "Coupon Manage",
+        icon: "ticket",
+        children: [
+          { label: "Coupon List", href: "/vendor/coupons" },
+          { label: "Add Coupon", href: "/vendor/coupons/add" },
+        ],
+      },
       { label: "POS", href: "#", icon: "pos" },
     ],
   },

@@ -25,6 +25,7 @@ const CRUMB_LABELS: Record<string, string> = {
   profile: "Profile",
   "change-password": "Change Password",
   products: "Products",
+  coupons: "Coupons",
   orders: "Orders",
   customers: "Customers",
   vendors: "Vendors",

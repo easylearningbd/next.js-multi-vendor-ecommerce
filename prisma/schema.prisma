@@ -40,6 +40,21 @@ enum ProductDiscountType {
   PERCENT
 }
 
+// A vendor coupon's discount kind. `value` is a percentage for PERCENTAGE, a currency
+// amount for FIXED, and ignored for FREE_SHIPPING.
+enum CouponType {
+  PERCENTAGE
+  FIXED
+  FREE_SHIPPING
+}
+
+// STORE_WIDE applies to all of the vendor's items in a cart; SPECIFIC_PRODUCTS applies
+// only to the attached products (via CouponProduct).
+enum CouponScope {
+  STORE_WIDE
+  SPECIFIC_PRODUCTS
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -80,6 +95,7 @@ model Vendor {
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   products Product[]
+  coupons  Coupon[]
 }
 
 model Brand {
@@ -213,6 +229,7 @@ model Product {
   subCategory    SubCategory?       @relation(fields: [subCategoryId], references: [id], onDelete: Restrict)
   subSubCategory SubSubCategory?    @relation(fields: [subSubCategoryId], references: [id], onDelete: Restrict)
   variations     ProductVariation[]
+  couponProducts CouponProduct[]
 
   @@index([vendorId])
   @@index([categoryId])
@@ -235,6 +252,56 @@ model ProductVariation {
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([productId])
+}
+
+// ---- Coupons ----
+// A coupon belongs to exactly one vendor (scope every query by vendorId). CORE RULE:
+// a coupon may only ever discount ITS vendor's own line items — enforced in
+// validateCoupon() server-side, never in the schema. Money is ALWAYS Decimal(10,2).
+model Coupon {
+  id       String @id @default(cuid())
+  vendorId String
+
+  code  String // unique PER VENDOR (see @@unique below) — two vendors can share "SAVE10"
+  title String
+
+  type  CouponType
+  value Decimal    @db.Decimal(10, 2) // percentage for PERCENTAGE, amount for FIXED
+
+  scope CouponScope @default(STORE_WIDE)
+
+  minSpend    Decimal? @db.Decimal(10, 2) // minimum cart subtotal (this vendor's items)
+  maxDiscount Decimal? @db.Decimal(10, 2) // cap for PERCENTAGE coupons
+
+  usageLimit        Int? // total redemptions allowed (null = unlimited)
+  usageLimitPerUser Int? // per-customer cap (null = unlimited)
+  usedCount         Int  @default(0)
+
+  startsAt  DateTime
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor   Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  products CouponProduct[]
+
+  // Code is unique within a vendor, not globally.
+  @@unique([vendorId, code])
+  @@index([vendorId])
+}
+
+// Join table for SPECIFIC_PRODUCTS coupons ↔ the vendor's products they apply to.
+model CouponProduct {
+  couponId  String
+  productId String
+
+  coupon  Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, productId])
   @@index([productId])
 }
 
