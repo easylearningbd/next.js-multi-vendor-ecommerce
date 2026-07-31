@@ -66,6 +66,17 @@ export const adminNav: SellerNavSection[] = [
           { label: "Vendor List", href: "/admin/vendors" },
         ],
       },
+      {
+        label: "Product Manage",
+        icon: "box",
+        children: [
+          { label: "Pending Product", href: "/admin/products/pending" },
+          { label: "Approved Product", href: "/admin/products/approved" },
+          { label: "Denied Product", href: "/admin/products/denied" },
+          { label: "Featured Product", href: "/admin/products/featured" },
+          { label: "Popular Product", href: "/admin/products/popular" },
+        ],
+      },
     ],
   },
 ];

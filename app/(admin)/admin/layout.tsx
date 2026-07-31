@@ -14,8 +14,11 @@ export default async function AdminLayout({
   const session = await requireRole("ADMIN", "/admin/login");
   const user = session.user;
 
-  // Pending-vendor queue count → "Vendor Manage" sidebar badge.
-  const pendingVendors = await prisma.vendor.count({ where: { status: "PENDING" } });
+  // Pending queue counts → sidebar group badges.
+  const [pendingVendors, pendingProducts] = await Promise.all([
+    prisma.vendor.count({ where: { status: "PENDING" } }),
+    prisma.product.count({ where: { approvalStatus: "PENDING" } }),
+  ]);
 
   return (
     <SellerShell
@@ -28,7 +31,7 @@ export default async function AdminLayout({
       notifCount={12}
       nav={adminNav}
       showRail={false}
-      badges={{ "Vendor Manage": pendingVendors }}
+      badges={{ "Vendor Manage": pendingVendors, "Product Manage": pendingProducts }}
     >
       {children}
     </SellerShell>

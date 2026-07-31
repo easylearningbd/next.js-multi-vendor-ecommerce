@@ -1,0 +1,19 @@
+import type { ProductApprovalStatus } from "@prisma/client";
+
+// Design system §2 tokens. NOTE: the enum value REJECTED is shown as "Denied" in the
+// admin UI (stored value stays REJECTED — one enum, consistent with the vendor pages).
+const MAP: Record<ProductApprovalStatus, { label: string; cls: string; dot: string }> = {
+  APPROVED: { label: "Approved", cls: "bg-success-bg text-success", dot: "bg-success" },
+  PENDING: { label: "Pending", cls: "bg-warning-bg text-warning", dot: "bg-warning" },
+  REJECTED: { label: "Denied", cls: "bg-error-bg text-error", dot: "bg-error" },
+};
+
+export function AdminProductStatusBadge({ status }: { status: ProductApprovalStatus }) {
+  const s = MAP[status];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-sans text-[11px] font-semibold ${s.cls}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+      {s.label}
+    </span>
+  );
+}
