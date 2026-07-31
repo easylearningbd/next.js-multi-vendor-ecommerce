@@ -28,3 +28,49 @@ export type AdminProductsQuery = {
   page?: number;
   pageSize?: number;
 };
+
+export type AdminProductDetailVariation = {
+  id: string;
+  name: string;
+  attributes: Record<string, string>;
+  price: string;
+  stock: number;
+  sku: string | null;
+  image: string | null;
+};
+
+/** Full, serializable product for the admin review/details page. */
+export type AdminProductDetail = {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string | null;
+  description: string;
+  shortDescription: string | null;
+  vendorId: string;
+  vendorName: string;
+  vendorProductCount: number;
+  brandName: string | null;
+  categoryName: string;
+  subCategoryName: string | null;
+  subSubCategoryName: string | null;
+  price: string;
+  compareAtPrice: string | null;
+  discount: string | null;
+  discountType: "AMOUNT" | "PERCENT";
+  taxRate: string | null;
+  stock: number;
+  thumbnail: string | null;
+  gallery: string[];
+  metaTitle: string | null;
+  metaDescription: string | null;
+  approvalStatus: ProductApprovalStatus;
+  isActive: boolean;
+  isFeatured: boolean;
+  isPopular: boolean;
+  hasVariations: boolean;
+  variations: AdminProductDetailVariation[];
+  totalStock: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
