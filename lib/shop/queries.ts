@@ -127,6 +127,8 @@ export type StorefrontProduct = {
   brand: { name: string; slug: string } | null;
   /** Final selling price, "$…". */
   price: string;
+  /** Final selling price in integer cents (cart math / qty totals — no float). */
+  priceCents: number;
   /** Strikethrough price, or null when not on sale. */
   compareAt: string | null;
   /** Whole-percent discount badge, or null. */
@@ -154,6 +156,7 @@ function toCard(p: CardRow): StorefrontProduct {
     seller: { storeName: p.vendor.storeName, slug: p.vendor.slug },
     brand: p.brand ? { name: p.brand.name, slug: p.brand.slug } : null,
     price: pricing.price,
+    priceCents: pricing.priceCents,
     compareAt: pricing.compareAt,
     discountPercent: pricing.discountPercent,
     inStock,

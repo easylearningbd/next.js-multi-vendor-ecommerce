@@ -34,6 +34,8 @@ export function formatMoney(value: DecimalLike): string {
 export type CardPricing = {
   /** Final selling price the customer pays, as a "$…" display string. */
   price: string;
+  /** Final selling price in integer cents (for cart math / qty totals — no float). */
+  priceCents: number;
   /** Strikethrough "was" price, or null when the item is not on sale. */
   compareAt: string | null;
   /** Whole-percent discount for the badge (e.g. 18 → "−18%"), or null. */
@@ -80,6 +82,7 @@ export function computeCardPricing(p: {
 
   return {
     price: formatCents(finalCents),
+    priceCents: finalCents,
     compareAt: strikeCents != null ? formatCents(strikeCents) : null,
     discountPercent: discountPercent && discountPercent > 0 ? discountPercent : null,
   };

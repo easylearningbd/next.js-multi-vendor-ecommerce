@@ -96,6 +96,58 @@ export function CategoryTilesSkeleton() {
   );
 }
 
+export function TopSellersSkeleton() {
+  return (
+    <section className={`${SECTION} pt-18`}>
+      <HeaderSkeleton />
+      <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(230px,1fr))]">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="overflow-hidden rounded-[18px] border border-line-soft bg-surface"
+          >
+            <div className="h-[60px] animate-pulse bg-line-soft" />
+            <div className="px-[18px] pb-5">
+              <div className="-mt-7 size-14 animate-pulse rounded-2xl border-4 border-surface bg-line-soft" />
+              <div className="mt-3.5 h-4 w-28 animate-pulse rounded bg-line-soft" />
+              <div className="mt-3 h-2.5 w-20 animate-pulse rounded bg-line-soft" />
+              <div className="mt-4 h-10 w-full animate-pulse rounded-[10px] bg-line-soft" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function BrandsSkeleton() {
+  return (
+    <section className={`${SECTION} pt-18`}>
+      <HeaderSkeleton />
+      <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-[76px] animate-pulse rounded-[14px] border border-line-soft bg-line-soft"
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function CategoryRailSkeleton() {
+  return (
+    <section className={`${SECTION} pt-18`}>
+      <div className="mb-[22px] flex items-center justify-between border-b border-line pb-4">
+        <div className="h-6 w-40 animate-pulse rounded bg-line-soft" />
+        <div className="h-4 w-16 animate-pulse rounded bg-line-soft" />
+      </div>
+      <GridSkeleton count={5} />
+    </section>
+  );
+}
+
 export function FeaturedDealsSkeleton() {
   return (
     <section className={`${SECTION} pt-18`}>

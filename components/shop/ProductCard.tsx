@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/dashboard/Icon";
+import { useQuickView } from "@/components/shop/quick-view/QuickViewProvider";
+import { useCart, toCartItem } from "@/components/shop/cart/CartProvider";
 import type { StorefrontProduct } from "@/lib/shop/queries";
 
 /**
@@ -11,18 +13,15 @@ import type { StorefrontProduct } from "@/lib/shop/queries";
  * the wishlist heart toggles locally, and Add-to-cart gives transient feedback.
  *
  * Seams for later parts:
- *  - onQuickView (Part 6): when provided, the eye opens the quick-view modal;
- *    otherwise it links to the product page. Title/image always link there.
+ *  - Quick view (Part 6): the eye opens the modal via the QuickView context when
+ *    a provider is mounted (it is, storefront-wide); otherwise it links to the
+ *    product page. Title/image always link there.
  *  - Add to cart (Part 7): currently a transient visual — the TODO(part7-cart)
  *    seam is where the client cart store's addItem() gets called.
  */
-export function ProductCard({
-  product,
-  onQuickView,
-}: {
-  product: StorefrontProduct;
-  onQuickView?: (product: StorefrontProduct) => void;
-}) {
+export function ProductCard({ product }: { product: StorefrontProduct }) {
+  const quickView = useQuickView();
+  const { addItem } = useCart();
   const [wished, setWished] = useState(false);
   const [added, setAdded] = useState(false);
 
@@ -30,7 +29,7 @@ export function ProductCard({
   const filledStars = Math.round(product.rating ?? 0);
 
   function handleAddToCart() {
-    // TODO(part7-cart): call the client cart store's addItem(product) here.
+    addItem(toCartItem(product));
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   }
@@ -53,11 +52,11 @@ export function ProductCard({
           )}
         </Link>
 
-        {/* Quick view — modal (Part 6) when a handler is provided, else product page */}
-        {onQuickView ? (
+        {/* Quick view — opens the modal when the provider is mounted, else links out */}
+        {quickView ? (
           <button
             type="button"
-            onClick={() => onQuickView(product)}
+            onClick={() => quickView.open(product.id)}
             aria-label="Quick view"
             className="absolute left-1/2 top-1/2 z-[3] flex size-[50px] -translate-x-1/2 -translate-y-1/2 scale-75 items-center justify-center rounded-full bg-surface text-iris-500 opacity-0 shadow-[0_10px_24px_-6px_rgba(20,18,31,0.32)] transition-[opacity,transform] duration-200 group-hover:scale-100 group-hover:opacity-100 hover:bg-iris-500 hover:text-white"
           >

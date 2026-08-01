@@ -1,5 +1,7 @@
 import { StorefrontHeader } from "@/components/shop/StorefrontHeader";
 import { StorefrontFooter } from "@/components/shop/StorefrontFooter";
+import { CartProvider } from "@/components/shop/cart/CartProvider";
+import { QuickViewProvider } from "@/components/shop/quick-view/QuickViewProvider";
 import { getStorefrontCategoryTree } from "@/lib/shop/queries";
 
 /**
@@ -16,10 +18,14 @@ export default async function ShopLayout({
   const categories = await getStorefrontCategoryTree();
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg">
-      <StorefrontHeader categories={categories} />
-      <main className="flex-1">{children}</main>
-      <StorefrontFooter />
-    </div>
+    <CartProvider>
+      <QuickViewProvider>
+        <div className="flex min-h-screen flex-col bg-bg">
+          <StorefrontHeader categories={categories} />
+          <main className="flex-1">{children}</main>
+          <StorefrontFooter />
+        </div>
+      </QuickViewProvider>
+    </CartProvider>
   );
 }
