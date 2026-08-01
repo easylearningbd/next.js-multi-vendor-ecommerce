@@ -438,10 +438,251 @@ export async function getQuickViewProduct(
       price: formatMoney(v.price),
       inStock: v.stock > 0,
       image: v.image,
-      attributes:
-        v.attributes && typeof v.attributes === "object" && !Array.isArray(v.attributes)
-          ? (v.attributes as Record<string, string>)
-          : {},
+      attributes: toAttributes(v.attributes),
     })),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Product detail page (/products/[slug])                             */
+/* ------------------------------------------------------------------ */
+
+/** JSON attributes → a plain string map (e.g. { Color: "Red", Size: "M" }). */
+function toAttributes(json: Prisma.JsonValue | null): Record<string, string> {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(json)) {
+    if (typeof v === "string") out[k] = v;
+    else if (v != null) out[k] = String(v);
+  }
+  return out;
+}
+
+/** Primary thumbnail + gallery images, de-duped, nulls dropped. */
+function buildGallery(thumbnail: string | null, gallery: Prisma.JsonValue | null): string[] {
+  return [...new Set([thumbnail, ...parseGallery(gallery)].filter((x): x is string => !!x))];
+}
+
+export type DetailVariation = {
+  id: string;
+  name: string;
+  /** This variation's own price, display + integer cents (cart math). */
+  price: string;
+  priceCents: number;
+  /** This variation's stock (for the qty stepper + out-of-stock). */
+  stock: number;
+  image: string | null;
+  attributes: Record<string, string>;
+};
+
+export type CategoryPath = {
+  category: { name: string; slug: string };
+  subCategory: { name: string; slug: string } | null;
+  subSubCategory: { name: string; slug: string } | null;
+};
+
+export type ProductDetail = StorefrontProduct & {
+  vendorId: string;
+  sku: string | null;
+  shortDescription: string | null;
+  description: string;
+  /** Full image list (thumbnail first). */
+  gallery: string[];
+  /** Base-product stock (used when there are no variations). */
+  stock: number;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  categoryPath: CategoryPath;
+  vendor: { id: string; storeName: string; slug: string; logo: string | null };
+  variations: DetailVariation[];
+};
+
+/**
+ * Full product for the detail page — visibility-filtered. Returns null if the
+ * slug is unknown or the product is not APPROVED+active (caller → notFound()).
+ * One query with includes (no N+1); the vendor's product count / similar rails
+ * are separate, intentional queries.
+ */
+export const getProductBySlug = cache(async function getProductBySlug(
+  slug: string,
+): Promise<ProductDetail | null> {
+  const p = await prisma.product.findFirst({
+    where: { slug, ...STOREFRONT_VISIBILITY },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      thumbnail: true,
+      price: true,
+      compareAtPrice: true,
+      discount: true,
+      discountType: true,
+      stock: true,
+      isFeatured: true,
+      isPopular: true,
+      createdAt: true,
+      sku: true,
+      shortDescription: true,
+      description: true,
+      gallery: true,
+      metaTitle: true,
+      metaDescription: true,
+      brand: { select: { name: true, slug: true } },
+      vendor: { select: { id: true, storeName: true, slug: true, logo: true } },
+      category: { select: { name: true, slug: true } },
+      subCategory: { select: { name: true, slug: true } },
+      subSubCategory: { select: { name: true, slug: true } },
+      variations: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          stock: true,
+          image: true,
+          attributes: true,
+        },
+      },
+    },
+  });
+  if (!p) return null;
+
+  const card = toCard(p);
+
+  return {
+    ...card,
+    vendorId: p.vendor.id,
+    sku: p.sku,
+    shortDescription: p.shortDescription,
+    description: p.description,
+    gallery: buildGallery(p.thumbnail, p.gallery),
+    stock: p.stock,
+    metaTitle: p.metaTitle,
+    metaDescription: p.metaDescription,
+    categoryPath: {
+      category: p.category,
+      subCategory: p.subCategory,
+      subSubCategory: p.subSubCategory,
+    },
+    vendor: {
+      id: p.vendor.id,
+      storeName: p.vendor.storeName,
+      slug: p.vendor.slug,
+      logo: p.vendor.logo,
+    },
+    variations: p.variations.map((v) => {
+      const pricing = computeCardPricing({
+        price: v.price,
+        compareAtPrice: null,
+        discount: null,
+        discountType: "AMOUNT",
+      });
+      return {
+        id: v.id,
+        name: v.name,
+        price: pricing.price,
+        priceCents: pricing.priceCents,
+        stock: v.stock,
+        image: v.image,
+        attributes: toAttributes(v.attributes),
+      };
+    }),
+  };
+});
+
+export type VendorSummary = {
+  id: string;
+  storeName: string;
+  slug: string;
+  logo: string | null;
+  coverImage: string | null;
+  productCount: number;
+  /** TODO(reviews): no Review model yet. */
+  rating: number | null;
+};
+
+/** Vendor card data for the detail page: store info + its visible-product count. */
+export async function getVendorForProduct(
+  vendorId: string,
+): Promise<VendorSummary | null> {
+  const [vendor, productCount] = await Promise.all([
+    prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { id: true, storeName: true, slug: true, logo: true, coverImage: true },
+    }),
+    prisma.product.count({ where: { vendorId, ...STOREFRONT_VISIBILITY } }),
+  ]);
+  if (!vendor) return null;
+  return { ...vendor, productCount, rating: null };
+}
+
+/** Other visible products from the same vendor (excludes the current product). */
+export function getMoreFromVendor(
+  vendorId: string,
+  excludeProductId: string,
+  take = 6,
+): Promise<StorefrontProduct[]> {
+  return findVisibleCards(
+    { vendorId, id: { not: excludeProductId } },
+    { createdAt: "desc" },
+    take,
+  );
+}
+
+/**
+ * Visible products in the same (top-level) category, excluding the current one.
+ * categoryId is already the broadest taxonomy level, so this is the natural
+ * "similar" set; there is no parent above it to fall back to.
+ */
+export function getSimilarProducts(
+  categoryId: string,
+  excludeProductId: string,
+  take = 6,
+): Promise<StorefrontProduct[]> {
+  return findVisibleCards(
+    { categoryId, id: { not: excludeProductId } },
+    { createdAt: "desc" },
+    take,
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Reviews — NO Review model exists yet (see Part 4).                 */
+/* ------------------------------------------------------------------ */
+
+export type ProductReview = {
+  id: string;
+  author: string;
+  avatar: string | null;
+  rating: number;
+  date: string;
+  text: string;
+  photos: string[];
+};
+
+export type ProductReviews = {
+  average: number | null;
+  count: number;
+  /** Bucketed 5★ → 1★ counts. */
+  distribution: { stars: number; count: number }[];
+  reviews: ProductReview[];
+};
+
+/**
+ * Product reviews. TODO(reviews): there is no Review model in the schema yet, so
+ * this returns an empty summary and the UI renders a "No reviews yet" state.
+ * When a Review model lands, query it here (by productId) and populate the same
+ * shape — the reviews UI already consumes it. `productId` is accepted now so the
+ * call sites don't change later.
+ */
+export async function getProductReviews(
+  productId: string,
+): Promise<ProductReviews> {
+  void productId;
+  return {
+    average: null,
+    count: 0,
+    distribution: [5, 4, 3, 2, 1].map((stars) => ({ stars, count: 0 })),
+    reviews: [],
   };
 }
