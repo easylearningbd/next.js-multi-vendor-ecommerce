@@ -231,8 +231,10 @@ four; never leave a bare spinner or blank.
 ## 12. Not in this product (do not build)
 
 Auctions · Publication House / Authors / Creators filters · Chat-with-vendor (we use an
-**AI support agent**) · Cash on Delivery (**Stripe-only**) · Google Maps address picker ·
-currency / language switchers.
+**AI support agent**) · Google Maps address picker · currency / language switchers.
+
+**Payments:** Cash on Delivery (COD) **is supported in v1**; Stripe is added later.
+(Earlier drafts said "Stripe-only, no COD" — superseded.)
 
 ---
 

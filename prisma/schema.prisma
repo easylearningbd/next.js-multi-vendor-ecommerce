@@ -70,6 +70,7 @@ model User {
   vendor   Vendor?
   accounts Account[]
   sessions Session[]
+  orders   Order[]
 }
 
 model Vendor {
@@ -93,9 +94,10 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  products Product[]
-  coupons  Coupon[]
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products  Product[]
+  coupons   Coupon[]
+  subOrders SubOrder[]
 }
 
 model Brand {
@@ -233,6 +235,7 @@ model Product {
   subSubCategory SubSubCategory?    @relation(fields: [subSubCategoryId], references: [id], onDelete: Restrict)
   variations     ProductVariation[]
   couponProducts CouponProduct[]
+  orderItems     OrderItem[]
 
   @@index([vendorId])
   @@index([categoryId])
@@ -255,7 +258,8 @@ model ProductVariation {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
 
   @@index([productId])
 }
@@ -290,8 +294,9 @@ model Coupon {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vendor   Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  products CouponProduct[]
+  vendor    Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  products  CouponProduct[]
+  subOrders SubOrder[]
 
   // Code is unique within a vendor, not globally.
   @@unique([vendorId, code])
@@ -347,4 +352,127 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Orders — a marketplace order splits into per-vendor sub-orders.
+// COD in v1; paymentMethod is enum so a STRIPE branch slots in later.
+// ---------------------------------------------------------------------------
+
+enum PaymentMethod {
+  COD
+  STRIPE
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+// One lifecycle shared by the parent Order and each SubOrder.
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PACKAGING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELED
+  RETURNED
+}
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique // human-readable, e.g. CVT-7F3K9A
+  customerId  String
+
+  // Shipping address snapshot (typed fields — queryable, survives profile edits).
+  shipName    String
+  shipEmail   String
+  shipPhone   String
+  shipCountry String
+  shipCity    String
+  shipZip     String
+  shipAddress String @db.Text
+
+  // Billing address — all null means "same as shipping".
+  billName    String?
+  billEmail   String?
+  billPhone   String?
+  billCountry String?
+  billCity    String?
+  billZip     String?
+  billAddress String? @db.Text
+
+  // Money — server-computed at placement (all Decimal, never float).
+  subtotal   Decimal @db.Decimal(10, 2)
+  discount   Decimal @default(0) @db.Decimal(10, 2)
+  tax        Decimal @default(0) @db.Decimal(10, 2)
+  shipping   Decimal @default(0) @db.Decimal(10, 2)
+  grandTotal Decimal @db.Decimal(10, 2)
+
+  shippingMethod String? // simple flat method label for now
+
+  paymentMethod PaymentMethod @default(COD)
+  paymentStatus PaymentStatus @default(UNPAID)
+  status        OrderStatus   @default(PENDING)
+
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Restrict: a customer with orders cannot be hard-deleted (order history is kept).
+  customer  User       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  subOrders SubOrder[]
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+model SubOrder {
+  id       String @id @default(cuid())
+  orderId  String
+  vendorId String
+
+  subtotal Decimal @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+
+  couponId String? // the vendor coupon applied to THIS sub-order, if any
+
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  order  Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor Vendor      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  coupon Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items  OrderItem[]
+
+  @@index([orderId])
+  @@index([vendorId])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  subOrderId  String
+  productId   String
+  variationId String?
+
+  // Snapshots — order history survives later product/price edits or deletion.
+  productName  String
+  variantLabel String?
+  unitPrice    Decimal @db.Decimal(10, 2)
+  qty          Int
+  lineTotal    Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  subOrder  SubOrder          @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  // Restrict: a product referenced by orders is deactivated, not hard-deleted.
+  product   Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variation ProductVariation? @relation(fields: [variationId], references: [id], onDelete: SetNull)
+
+  @@index([subOrderId])
+  @@index([productId])
 }

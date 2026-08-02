@@ -24,8 +24,11 @@ functional Next.js application must do so those screens become a working product
 
 ### Non-goals (explicitly out of scope)
 Auctions · Publication House / Authors / Creators · chat-with-vendor (replaced by an **AI
-support agent**) · Cash on Delivery (**Stripe-only**) · Google Maps address picker ·
-currency / language switchers.
+support agent**) · Google Maps address picker · currency / language switchers.
+
+**Payments:** **Cash on Delivery (COD) is supported in v1**; Stripe (card + wallet) is
+added later. The order model is payment-method-agnostic (`paymentMethod: COD | STRIPE`).
+(Earlier drafts said "Stripe-only, no COD" — that is superseded by this line.)
 
 ### Success metrics
 - Checkout completion rate; cart-to-order conversion.
@@ -119,7 +122,8 @@ modal) · Track Order. Account sidebar shell; customer sees only their own data.
 - Add/remove/update qty; cart persists (localStorage for guests, server for logged-in).
 - Cart and order **group by seller**; subtotals computed per seller and combined.
 - Checkout collects shipping/billing, shipping method, and payment.
-- **Stripe only** (Checkout or PaymentIntents). No COD paths anywhere.
+- **COD in v1**; Stripe (Checkout / PaymentIntents) added later. `paymentMethod` is an
+  enum (`COD | STRIPE`) so the Stripe branch slots in without restructuring the order flow.
 - Placing an order fans out into per-seller sub-orders, each independently trackable.
 
 ### 5.3 Orders & fulfillment
