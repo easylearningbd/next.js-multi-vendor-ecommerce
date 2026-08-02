@@ -26,7 +26,7 @@ export async function CategoryRailSection({
           {title}
         </h2>
         <Link
-          href={`/categories/${slug}`}
+          href={`/category/${slug}`}
           className="flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-semibold text-iris-500 hover:text-iris-600"
         >
           View all

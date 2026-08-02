@@ -19,7 +19,7 @@ export async function ShopByCategorySection() {
           {categories.map((c) => (
             <Link
               key={c.id}
-              href={`/categories/${c.slug}`}
+              href={`/category/${c.slug}`}
               className="flex flex-col items-center gap-3.5 rounded-[18px] border border-line-soft bg-surface px-4 py-[26px] shadow-[0_1px_2px_rgba(20,18,31,0.05)] transition-[box-shadow,transform] duration-200 hover:-translate-y-[3px] hover:shadow-[0_16px_34px_-14px_rgba(20,18,31,0.18)]"
             >
               <div className="flex size-[66px] items-center justify-center overflow-hidden rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--color-iris-100),var(--color-iris-50))] text-iris-500">

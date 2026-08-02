@@ -11,10 +11,10 @@ import type { CategoryNode } from "@/lib/shop/queries";
  * the hovered category's sub-categories (with their sub-sub-categories) grouped
  * on the right — the real 3-level DB tree.
  *
- * Every level links to its listing route (built later — link only):
- *   category  → /categories/[slug]
- *   sub       → /categories/[slug]?sub=[subSlug]
- *   sub-sub   → /categories/[slug]?sub=[subSlug]&item=[subSubSlug]
+ * Every level links to its listing route (/category/[...slug]):
+ *   category  → /category/[slug]
+ *   sub       → /category/[slug]/[subSlug]
+ *   sub-sub   → /category/[slug]/[subSlug]/[subSubSlug]
  */
 export function CategoryMegaMenu({ categories }: { categories: CategoryNode[] }) {
   const [open, setOpen] = useState(false);
@@ -52,7 +52,7 @@ export function CategoryMegaMenu({ categories }: { categories: CategoryNode[] })
                 return (
                   <Link
                     key={c.id}
-                    href={`/categories/${c.slug}`}
+                    href={`/category/${c.slug}`}
                     onMouseEnter={() => setActiveId(c.id)}
                     className={`flex items-center justify-between rounded-[10px] px-3 py-2.5 font-sans text-[13px] transition-colors ${
                       isActive
@@ -79,7 +79,7 @@ export function CategoryMegaMenu({ categories }: { categories: CategoryNode[] })
                   {active.children.map((sub) => (
                     <div key={sub.id} className="min-w-[130px]">
                       <Link
-                        href={`/categories/${active.slug}?sub=${sub.slug}`}
+                        href={`/category/${active.slug}/${sub.slug}`}
                         className="mb-3.5 block font-display text-sm font-bold text-ink hover:text-iris-500"
                       >
                         {sub.name}
@@ -89,7 +89,7 @@ export function CategoryMegaMenu({ categories }: { categories: CategoryNode[] })
                           sub.children.map((item) => (
                             <Link
                               key={item.id}
-                              href={`/categories/${active.slug}?sub=${sub.slug}&item=${item.slug}`}
+                              href={`/category/${active.slug}/${sub.slug}/${item.slug}`}
                               className="font-sans text-[13px] text-muted hover:text-iris-500"
                             >
                               {item.name}
@@ -97,7 +97,7 @@ export function CategoryMegaMenu({ categories }: { categories: CategoryNode[] })
                           ))
                         ) : (
                           <Link
-                            href={`/categories/${active.slug}?sub=${sub.slug}`}
+                            href={`/category/${active.slug}/${sub.slug}`}
                             className="font-sans text-[13px] text-muted hover:text-iris-500"
                           >
                             View all

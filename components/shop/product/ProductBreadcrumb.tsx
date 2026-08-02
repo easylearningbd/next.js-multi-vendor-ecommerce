@@ -17,18 +17,18 @@ export function ProductBreadcrumb({
   const catSlug = path.category.slug;
   const crumbs: { label: string; href: string }[] = [
     { label: "Home", href: "/" },
-    { label: path.category.name, href: `/categories/${catSlug}` },
+    { label: path.category.name, href: `/category/${catSlug}` },
   ];
   if (path.subCategory) {
     crumbs.push({
       label: path.subCategory.name,
-      href: `/categories/${catSlug}?sub=${path.subCategory.slug}`,
+      href: `/category/${catSlug}/${path.subCategory.slug}`,
     });
   }
   if (path.subCategory && path.subSubCategory) {
     crumbs.push({
       label: path.subSubCategory.name,
-      href: `/categories/${catSlug}?sub=${path.subCategory.slug}&item=${path.subSubCategory.slug}`,
+      href: `/category/${catSlug}/${path.subCategory.slug}/${path.subSubCategory.slug}`,
     });
   }
 

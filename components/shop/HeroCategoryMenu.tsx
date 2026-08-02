@@ -11,10 +11,10 @@ import type { CategoryNode } from "@/lib/shop/queries";
  * mega-panel over the banner showing that category's sub-categories (group
  * titles) and their sub-sub-categories (items) — the real 3-level DB tree.
  *
- * Every level links to its listing route (built later — link only):
- *   category → /categories/[slug]
- *   sub      → /categories/[slug]?sub=[subSlug]
- *   sub-sub  → /categories/[slug]?sub=[subSlug]&item=[subSubSlug]
+ * Every level links to its listing route (/category/[...slug]):
+ *   category → /category/[slug]
+ *   sub      → /category/[slug]/[subSlug]
+ *   sub-sub  → /category/[slug]/[subSlug]/[subSubSlug]
  *
  * The rail is text-only, matching the design (no category image is used here).
  */
@@ -46,7 +46,7 @@ export function HeroCategoryMenu({
               return (
                 <Link
                   key={c.id}
-                  href={`/categories/${c.slug}`}
+                  href={`/category/${c.slug}`}
                   onMouseEnter={() => setActiveId(c.id)}
                   className={`flex items-center justify-between rounded-[10px] px-3.5 py-2.75 font-sans text-[13.5px] transition-colors ${
                     isActive
@@ -81,7 +81,7 @@ export function HeroCategoryMenu({
                 {active.children.map((sub) => (
                   <div key={sub.id} className="min-w-[158px]">
                     <Link
-                      href={`/categories/${active.slug}?sub=${sub.slug}`}
+                      href={`/category/${active.slug}/${sub.slug}`}
                       className="mb-4 block font-display text-[15px] font-bold text-ink hover:text-iris-500"
                     >
                       {sub.name}
@@ -91,7 +91,7 @@ export function HeroCategoryMenu({
                         sub.children.map((item) => (
                           <Link
                             key={item.id}
-                            href={`/categories/${active.slug}?sub=${sub.slug}&item=${item.slug}`}
+                            href={`/category/${active.slug}/${sub.slug}/${item.slug}`}
                             className="font-sans text-[13.5px] text-muted hover:text-iris-500"
                           >
                             {item.name}
@@ -99,7 +99,7 @@ export function HeroCategoryMenu({
                         ))
                       ) : (
                         <Link
-                          href={`/categories/${active.slug}?sub=${sub.slug}`}
+                          href={`/category/${active.slug}/${sub.slug}`}
                           className="font-sans text-[13.5px] text-muted hover:text-iris-500"
                         >
                           View all

@@ -100,7 +100,7 @@ export default async function ProductPage({ params }: { params: Params }) {
         <section className="mx-auto max-w-[var(--container-max)] px-[var(--cpad)] pt-14">
           <SectionHeader
             title="Similar Products"
-            viewAllHref={`/categories/${product.categoryPath.category.slug}`}
+            viewAllHref={`/category/${product.categoryPath.category.slug}`}
             viewAllLabel="View all"
           />
           <ProductGrid products={similar} />

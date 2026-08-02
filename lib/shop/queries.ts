@@ -962,3 +962,260 @@ export async function getVendorStoreFacets(
       .sort(byCount),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Category listing (/category/[...slug])                             */
+/* ------------------------------------------------------------------ */
+
+export type CategoryTrailItem = {
+  name: string;
+  slug: string;
+  href: string;
+  level: 1 | 2 | 3;
+};
+export type CategoryChild = { name: string; slug: string; href: string };
+
+export type ResolvedCategory = {
+  level: 1 | 2 | 3;
+  id: string;
+  name: string;
+  slug: string;
+  /** Slug path segments, e.g. ["fashion","t-shirt"]. */
+  path: string[];
+  /** Selects every visible product at OR below this node (FKs are denormalized). */
+  productWhere: Prisma.ProductWhereInput;
+  /** Ancestor chain incl. the node itself, for the breadcrumb (Home added in UI). */
+  trail: CategoryTrailItem[];
+  /** Direct child categories (for the in-category sub-nav). Empty at leaf level. */
+  children: CategoryChild[];
+};
+
+const _resolveCategoryPath = cache(
+  async (key: string): Promise<ResolvedCategory | null> => {
+    const path = key.split("/").filter(Boolean);
+    if (path.length < 1 || path.length > 3) return null;
+    const [catSlug, subSlug, subSubSlug] = path;
+
+    const category = await prisma.category.findUnique({
+      where: { slug: catSlug },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!category) return null;
+
+    const catHref = `/category/${category.slug}`;
+    const catTrail: CategoryTrailItem = {
+      name: category.name,
+      slug: category.slug,
+      href: catHref,
+      level: 1,
+    };
+
+    if (path.length === 1) {
+      const children = await prisma.subCategory.findMany({
+        where: { categoryId: category.id },
+        orderBy: { name: "asc" },
+        select: { name: true, slug: true },
+      });
+      return {
+        level: 1,
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        path: [category.slug],
+        productWhere: { categoryId: category.id },
+        trail: [catTrail],
+        children: children.map((c) => ({
+          name: c.name,
+          slug: c.slug,
+          href: `${catHref}/${c.slug}`,
+        })),
+      };
+    }
+
+    // Nesting is validated by scoping each lookup to its parent id.
+    const sub = await prisma.subCategory.findFirst({
+      where: { categoryId: category.id, slug: subSlug },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!sub) return null;
+
+    const subHref = `${catHref}/${sub.slug}`;
+    const subTrail: CategoryTrailItem = {
+      name: sub.name,
+      slug: sub.slug,
+      href: subHref,
+      level: 2,
+    };
+
+    if (path.length === 2) {
+      const children = await prisma.subSubCategory.findMany({
+        where: { subCategoryId: sub.id },
+        orderBy: { name: "asc" },
+        select: { name: true, slug: true },
+      });
+      return {
+        level: 2,
+        id: sub.id,
+        name: sub.name,
+        slug: sub.slug,
+        path: [category.slug, sub.slug],
+        productWhere: { subCategoryId: sub.id },
+        trail: [catTrail, subTrail],
+        children: children.map((c) => ({
+          name: c.name,
+          slug: c.slug,
+          href: `${subHref}/${c.slug}`,
+        })),
+      };
+    }
+
+    const subSub = await prisma.subSubCategory.findFirst({
+      where: { subCategoryId: sub.id, slug: subSubSlug },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!subSub) return null;
+
+    const subSubHref = `${subHref}/${subSub.slug}`;
+    return {
+      level: 3,
+      id: subSub.id,
+      name: subSub.name,
+      slug: subSub.slug,
+      path: [category.slug, sub.slug, subSub.slug],
+      productWhere: { subSubCategoryId: subSub.id },
+      trail: [
+        catTrail,
+        subTrail,
+        { name: subSub.name, slug: subSub.slug, href: subSubHref, level: 3 },
+      ],
+      children: [],
+    };
+  },
+);
+
+/**
+ * Resolve a /category/[...slug] path to its node + ancestor chain, validating
+ * that the path is real and correctly nested. Returns null → caller notFound().
+ */
+export function resolveCategoryPath(
+  slugArray: string[],
+): Promise<ResolvedCategory | null> {
+  return _resolveCategoryPath(slugArray.join("/"));
+}
+
+export type CategorySort = "newest" | "price-asc" | "price-desc" | "rating";
+
+/**
+ * All APPROVED+active products at or below a category node, with in-category
+ * search + brand (DB-level) and price range + sort (on the FINAL displayed
+ * price) + pagination. Price/sort run in memory so they use the discounted
+ * price the shopper sees; TODO(scale): move to a stored computed-price column
+ * if a single category ever holds very many products.
+ */
+export async function getCategoryProducts(
+  node: ResolvedCategory,
+  opts: {
+    min?: number;
+    max?: number;
+    brand?: string;
+    sort?: CategorySort;
+    page?: number;
+    perPage?: number;
+    search?: string;
+  } = {},
+): Promise<Paginated<StorefrontProduct>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const perPage = opts.perPage ?? 12;
+  const search = opts.search?.trim();
+
+  const where: Prisma.ProductWhereInput = {
+    ...node.productWhere,
+    ...STOREFRONT_VISIBILITY,
+    ...(search ? { name: { contains: search } } : {}),
+    ...(opts.brand ? { brand: { slug: opts.brand } } : {}),
+  };
+
+  let cards = (
+    await prisma.product.findMany({ where, select: CARD_SELECT })
+  ).map(toCard);
+
+  if (opts.min != null) {
+    const minC = Math.round(opts.min * 100);
+    cards = cards.filter((c) => c.priceCents >= minC);
+  }
+  if (opts.max != null) {
+    const maxC = Math.round(opts.max * 100);
+    cards = cards.filter((c) => c.priceCents <= maxC);
+  }
+
+  switch (opts.sort) {
+    case "price-asc":
+      cards.sort((a, b) => a.priceCents - b.priceCents);
+      break;
+    case "price-desc":
+      cards.sort((a, b) => b.priceCents - a.priceCents);
+      break;
+    case "rating":
+      // TODO(reviews): no ratings yet — proxy by the admin isPopular flag, then recency.
+      cards.sort(
+        (a, b) =>
+          Number(b.isPopular) - Number(a.isPopular) ||
+          b.createdAt.localeCompare(a.createdAt),
+      );
+      break;
+    default: // newest / relevance
+      cards.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      break;
+  }
+
+  const total = cards.length;
+  const items = cards.slice((page - 1) * perPage, page * perPage);
+
+  return {
+    items,
+    total,
+    page,
+    perPage,
+    totalPages: Math.max(1, Math.ceil(total / perPage)),
+  };
+}
+
+export type CategoryFilters = {
+  /** Brands actually present in this category's visible products, with counts. */
+  brands: StoreFacet[];
+  /** Final-price range (whole dollars) of this category's visible products. */
+  priceMin: number;
+  priceMax: number;
+};
+
+/**
+ * The brands + price range that actually exist among this category's visible
+ * products, so the sidebar offers real, relevant options — not the whole store.
+ */
+export async function getFiltersForCategory(
+  node: ResolvedCategory,
+): Promise<CategoryFilters> {
+  const cards = (
+    await prisma.product.findMany({
+      where: { ...node.productWhere, ...STOREFRONT_VISIBILITY },
+      select: CARD_SELECT,
+    })
+  ).map(toCard);
+
+  const brandMap = new Map<string, StoreFacet>();
+  for (const c of cards) {
+    if (!c.brand) continue;
+    const e = brandMap.get(c.brand.slug);
+    if (e) e.count += 1;
+    else brandMap.set(c.brand.slug, { name: c.brand.name, slug: c.brand.slug, count: 1 });
+  }
+  const brands = [...brandMap.values()].sort(
+    (a, b) => b.count - a.count || a.name.localeCompare(b.name),
+  );
+
+  const cents = cards.map((c) => c.priceCents);
+  const priceMin = cents.length ? Math.floor(Math.min(...cents) / 100) : 0;
+  const priceMax = cents.length ? Math.ceil(Math.max(...cents) / 100) : 0;
+
+  return { brands, priceMin, priceMax };
+}
