@@ -17,6 +17,7 @@ export function OrderSummary({
   onPrimary,
   primaryDisabled = false,
   coupon,
+  terms,
 }: {
   subtotalCents: number;
   discountCents?: number;
@@ -25,6 +26,7 @@ export function OrderSummary({
   onPrimary: () => void;
   primaryDisabled?: boolean;
   coupon?: React.ReactNode;
+  terms?: React.ReactNode;
 }) {
   const t = computeTotals(subtotalCents, { shippingCents, discountCents });
 
@@ -65,6 +67,8 @@ export function OrderSummary({
           {formatCents(t.grandTotalCents)}
         </span>
       </div>
+
+      {terms}
 
       <button
         type="button"

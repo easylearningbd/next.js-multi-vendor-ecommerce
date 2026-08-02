@@ -2,11 +2,16 @@
 
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Icon } from "@/components/dashboard/Icon";
 import { formatCents } from "@/lib/shop/pricing";
 import { useCart, lineKey } from "@/components/shop/cart/CartProvider";
-import { applyCouponAction, type AppliedCoupon } from "@/app/(shop)/checkout/actions";
+import {
+  applyCouponAction,
+  placeOrder,
+  type AppliedCoupon,
+} from "@/app/(shop)/checkout/actions";
 import {
   addressSchema,
   defaultCheckoutForm,
@@ -17,6 +22,7 @@ import { CheckoutStepper, type CheckoutStep } from "@/components/shop/checkout/C
 import { CartStep } from "@/components/shop/checkout/CartStep";
 import { CouponForm } from "@/components/shop/checkout/CouponForm";
 import { ShippingStep, type ShippingErrors } from "@/components/shop/checkout/ShippingStep";
+import { PaymentStep } from "@/components/shop/checkout/PaymentStep";
 import { OrderSummary } from "@/components/shop/checkout/OrderSummary";
 
 type ContactDefaults = { name?: string | null; email?: string | null; phone?: string | null };
@@ -28,36 +34,47 @@ function useHydrated() {
   return useSyncExternalStore(noopSubscribe, () => true, () => false);
 }
 
-/** Placeholder for a step not yet built (Parts 4–5). */
-function StepPlaceholder({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <div className="rounded-[18px] border border-line-soft bg-surface p-8 shadow-[0_1px_2px_rgba(20,18,31,0.05)]">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="m-0 font-display text-[20px] font-bold text-ink">{title}</h2>
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-1.5 font-sans text-[13.5px] font-semibold text-iris-500 hover:text-iris-700"
-        >
-          <Icon name="chevronLeft" size={15} strokeWidth={2} />
-          Go back
-        </button>
-      </div>
-      <p className="font-sans text-sm text-muted">This step arrives in the next part.</p>
-    </div>
-  );
-}
-
 export function CheckoutFlow({ defaultContact }: { defaultContact?: ContactDefaults }) {
+  const router = useRouter();
   const hydrated = useHydrated();
-  const { count, subtotalCents, items } = useCart();
+  const { count, subtotalCents, items, clear } = useCart();
   const [step, setStep] = useState<CheckoutStep>("cart");
   const [applied, setApplied] = useState<AppliedCoupon[]>([]);
   const [couponPending, setCouponPending] = useState(false);
   const [form, setForm] = useState<CheckoutForm>(() => defaultCheckoutForm(defaultContact));
   const [shipErrors, setShipErrors] = useState<ShippingErrors>({});
+  const [note, setNote] = useState("");
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [placing, setPlacing] = useState(false);
 
   const shippingCents = shippingCostCents(form.shippingMethod);
+
+  async function handlePlaceOrder() {
+    if (placing || !agreedTerms) return;
+    setPlacing(true);
+    const res = await placeOrder({
+      cartItems: items.map((i) => ({
+        productId: i.productId,
+        variationId: i.variationId,
+        qty: i.qty,
+      })),
+      couponCodes: applied.map((c) => ({ code: c.code, vendorId: c.vendorId })),
+      shipping: form.shipping,
+      billing: form.billingSame ? null : form.billing,
+      billingSame: form.billingSame,
+      shippingMethod: form.shippingMethod,
+      note: note.trim() || undefined,
+    });
+    if (!res.ok) {
+      setPlacing(false);
+      toast.error(res.error);
+      if (res.code === "AUTH") router.push("/login?next=/checkout");
+      return;
+    }
+    // Success: clear the cart, then go to the confirmation page (reachable by URL).
+    clear();
+    router.push(`/order/confirmation/${res.orderNumber}`);
+  }
 
   function validateShipping(): boolean {
     const ship = addressSchema.safeParse(form.shipping);
@@ -165,7 +182,7 @@ export function CheckoutFlow({ defaultContact }: { defaultContact?: ContactDefau
               if (validateShipping()) setStep("payment");
             },
           }
-        : { label: "Place Order", action: () => {} }; // wired in Part 5
+        : { label: placing ? "Placing order…" : "Place Order", action: handlePlaceOrder };
 
   return (
     <div className="pb-20">
@@ -183,7 +200,11 @@ export function CheckoutFlow({ defaultContact }: { defaultContact?: ContactDefau
             <ShippingStep value={form} setForm={setForm} errors={shipErrors} />
           )}
           {step === "payment" && (
-            <StepPlaceholder title="Payment" onBack={() => setStep("shipping")} />
+            <PaymentStep
+              note={note}
+              onNoteChange={setNote}
+              onBack={() => setStep("shipping")}
+            />
           )}
         </div>
 
@@ -194,6 +215,7 @@ export function CheckoutFlow({ defaultContact }: { defaultContact?: ContactDefau
             shippingCents={shippingCents}
             primaryLabel={primary.label}
             onPrimary={primary.action}
+            primaryDisabled={step === "payment" && (!agreedTerms || placing)}
             coupon={
               <CouponForm
                 applied={validApplied}
@@ -201,6 +223,33 @@ export function CheckoutFlow({ defaultContact }: { defaultContact?: ContactDefau
                 onRemove={handleRemoveCoupon}
                 pending={couponPending}
               />
+            }
+            terms={
+              step === "payment" ? (
+                <label className="mb-4 flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={agreedTerms}
+                    onChange={(e) => setAgreedTerms(e.target.checked)}
+                    className="mt-0.5 size-[18px] flex-none accent-iris-500"
+                  />
+                  <span className="font-sans text-[12.5px] leading-[1.5] text-ink-soft">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-iris-500 hover:underline">
+                      Terms &amp; Conditions
+                    </Link>
+                    ,{" "}
+                    <Link href="/privacy" className="text-iris-500 hover:underline">
+                      Privacy Policy
+                    </Link>
+                    , and{" "}
+                    <Link href="/refund-policy" className="text-iris-500 hover:underline">
+                      Refund Policy
+                    </Link>
+                    .
+                  </span>
+                </label>
+              ) : undefined
             }
           />
         </div>
