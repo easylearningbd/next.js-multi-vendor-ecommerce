@@ -689,3 +689,207 @@ export async function getProductReviews(
     reviews: [],
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Sellers — list (/sellers) + store (/sellers/[slug])                */
+/* ------------------------------------------------------------------ */
+
+/** Only APPROVED vendors are ever shown to shoppers (never PENDING/SUSPENDED). */
+const APPROVED_VENDOR = { status: "APPROVED" } satisfies Prisma.VendorWhereInput;
+
+/** Filtered relation count of a vendor's currently-visible products (Prisma 6). */
+const VISIBLE_PRODUCT_COUNT = {
+  select: { products: { where: STOREFRONT_VISIBILITY } },
+} satisfies Prisma.VendorCountOutputTypeDefaultArgs;
+
+export type Paginated<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+};
+
+export type SellerCard = {
+  id: string;
+  storeName: string;
+  slug: string;
+  logo: string | null;
+  coverImage: string | null;
+  /** TODO(reviews): no Review model / Vendor.rating yet. */
+  rating: number | null;
+  productCount: number;
+};
+
+export type VendorSort = "featured" | "newest" | "name" | "products";
+
+/**
+ * Approved vendors for the seller list, paginated. `productCount` counts only
+ * APPROVED+active products. Sorts: featured/newest (recency), name (A–Z),
+ * products (by total listing count — see note).
+ */
+export async function getApprovedVendors(opts: {
+  search?: string;
+  sort?: VendorSort;
+  page?: number;
+  perPage?: number;
+} = {}): Promise<Paginated<SellerCard>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const perPage = opts.perPage ?? 12;
+  const search = opts.search?.trim();
+
+  const where: Prisma.VendorWhereInput = {
+    ...APPROVED_VENDOR,
+    ...(search ? { storeName: { contains: search } } : {}),
+  };
+
+  // NOTE: the "products" sort orders by total listing count (Prisma can't order
+  // by a *filtered* relation count); the displayed count stays visible-only.
+  const orderBy: Prisma.VendorOrderByWithRelationInput =
+    opts.sort === "name"
+      ? { storeName: "asc" }
+      : opts.sort === "products"
+        ? { products: { _count: "desc" } }
+        : { createdAt: "desc" };
+
+  const [total, vendors] = await Promise.all([
+    prisma.vendor.count({ where }),
+    prisma.vendor.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * perPage,
+      take: perPage,
+      select: {
+        id: true,
+        storeName: true,
+        slug: true,
+        logo: true,
+        coverImage: true,
+        _count: VISIBLE_PRODUCT_COUNT,
+      },
+    }),
+  ]);
+
+  return {
+    items: vendors.map((v) => ({
+      id: v.id,
+      storeName: v.storeName,
+      slug: v.slug,
+      logo: v.logo,
+      coverImage: v.coverImage,
+      rating: null,
+      productCount: v._count.products,
+    })),
+    total,
+    page,
+    perPage,
+    totalPages: Math.max(1, Math.ceil(total / perPage)),
+  };
+}
+
+export type StoreProfile = {
+  id: string;
+  storeName: string;
+  slug: string;
+  logo: string | null;
+  coverImage: string | null;
+  address: string | null;
+  /** TODO(reviews): no Review model / Vendor.rating yet. */
+  rating: number | null;
+  reviewCount: number;
+  /** TODO(orders): no Order model yet. */
+  orderCount: number;
+  productCount: number;
+  joinedAt: string;
+};
+
+/**
+ * Public store profile for an APPROVED vendor. Returns null for unknown or
+ * non-approved (PENDING/SUSPENDED) vendors → caller should notFound().
+ */
+export async function getVendorStore(slug: string): Promise<StoreProfile | null> {
+  const v = await prisma.vendor.findFirst({
+    where: { slug, ...APPROVED_VENDOR },
+    select: {
+      id: true,
+      storeName: true,
+      slug: true,
+      logo: true,
+      coverImage: true,
+      address: true,
+      createdAt: true,
+      _count: VISIBLE_PRODUCT_COUNT,
+    },
+  });
+  if (!v) return null;
+
+  return {
+    id: v.id,
+    storeName: v.storeName,
+    slug: v.slug,
+    logo: v.logo,
+    coverImage: v.coverImage,
+    address: v.address,
+    rating: null,
+    reviewCount: 0,
+    orderCount: 0,
+    productCount: v._count.products,
+    joinedAt: v.createdAt.toISOString(),
+  };
+}
+
+export type ProductSort = "newest" | "price-asc" | "price-desc" | "name";
+
+/**
+ * A vendor's APPROVED+active products, paginated, with optional in-store search,
+ * sort, and category filter. Money is display-ready (no float, no N+1).
+ */
+export async function getVendorProducts(
+  vendorId: string,
+  opts: {
+    search?: string;
+    sort?: ProductSort;
+    category?: string;
+    page?: number;
+    perPage?: number;
+  } = {},
+): Promise<Paginated<StorefrontProduct>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const perPage = opts.perPage ?? 12;
+  const search = opts.search?.trim();
+
+  const where: Prisma.ProductWhereInput = {
+    vendorId,
+    ...STOREFRONT_VISIBILITY,
+    ...(search ? { name: { contains: search } } : {}),
+    ...(opts.category ? { category: { slug: opts.category } } : {}),
+  };
+
+  const orderBy: Prisma.ProductOrderByWithRelationInput =
+    opts.sort === "price-asc"
+      ? { price: "asc" }
+      : opts.sort === "price-desc"
+        ? { price: "desc" }
+        : opts.sort === "name"
+          ? { name: "asc" }
+          : { createdAt: "desc" };
+
+  const [total, rows] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * perPage,
+      take: perPage,
+      select: CARD_SELECT,
+    }),
+  ]);
+
+  return {
+    items: rows.map(toCard),
+    total,
+    page,
+    perPage,
+    totalPages: Math.max(1, Math.ceil(total / perPage)),
+  };
+}
