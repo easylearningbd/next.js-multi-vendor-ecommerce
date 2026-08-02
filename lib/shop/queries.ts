@@ -807,7 +807,9 @@ export type StoreProfile = {
  * Public store profile for an APPROVED vendor. Returns null for unknown or
  * non-approved (PENDING/SUSPENDED) vendors → caller should notFound().
  */
-export async function getVendorStore(slug: string): Promise<StoreProfile | null> {
+export const getVendorStore = cache(async function getVendorStore(
+  slug: string,
+): Promise<StoreProfile | null> {
   const v = await prisma.vendor.findFirst({
     where: { slug, ...APPROVED_VENDOR },
     select: {
@@ -836,7 +838,7 @@ export async function getVendorStore(slug: string): Promise<StoreProfile | null>
     productCount: v._count.products,
     joinedAt: v.createdAt.toISOString(),
   };
-}
+});
 
 export type ProductSort = "newest" | "price-asc" | "price-desc" | "name";
 
@@ -850,6 +852,7 @@ export async function getVendorProducts(
     search?: string;
     sort?: ProductSort;
     category?: string;
+    brand?: string;
     page?: number;
     perPage?: number;
   } = {},
@@ -863,33 +866,99 @@ export async function getVendorProducts(
     ...STOREFRONT_VISIBILITY,
     ...(search ? { name: { contains: search } } : {}),
     ...(opts.category ? { category: { slug: opts.category } } : {}),
+    ...(opts.brand ? { brand: { slug: opts.brand } } : {}),
   };
 
-  const orderBy: Prisma.ProductOrderByWithRelationInput =
-    opts.sort === "price-asc"
-      ? { price: "asc" }
-      : opts.sort === "price-desc"
-        ? { price: "desc" }
-        : opts.sort === "name"
-          ? { name: "asc" }
-          : { createdAt: "desc" };
+  // One store's catalog is bounded, so we fetch all matching cards and sort +
+  // paginate in memory. This lets the price sort use the FINAL (discounted)
+  // price the shopper sees — not the raw list price a DB orderBy would use.
+  const cards = (
+    await prisma.product.findMany({ where, select: CARD_SELECT })
+  ).map(toCard);
 
-  const [total, rows] = await Promise.all([
-    prisma.product.count({ where }),
-    prisma.product.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * perPage,
-      take: perPage,
-      select: CARD_SELECT,
-    }),
-  ]);
+  switch (opts.sort) {
+    case "price-asc":
+      cards.sort((a, b) => a.priceCents - b.priceCents);
+      break;
+    case "price-desc":
+      cards.sort((a, b) => b.priceCents - a.priceCents);
+      break;
+    case "name":
+      cards.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    default: // newest — ISO timestamps sort lexicographically
+      cards.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      break;
+  }
+
+  const total = cards.length;
+  const items = cards.slice((page - 1) * perPage, page * perPage);
 
   return {
-    items: rows.map(toCard),
+    items,
     total,
     page,
     perPage,
     totalPages: Math.max(1, Math.ceil(total / perPage)),
+  };
+}
+
+export type StoreFacet = { name: string; slug: string; count: number };
+export type StoreFacets = { categories: StoreFacet[]; brands: StoreFacet[] };
+
+/**
+ * Category + brand facets for a store's filter sidebar — derived ONLY from that
+ * vendor's currently-visible products (so filters are scoped to the store), each
+ * with a live count. Two groupBys + two id-lookups (no N+1).
+ */
+export async function getVendorStoreFacets(
+  vendorId: string,
+): Promise<StoreFacets> {
+  const scope = { vendorId, ...STOREFRONT_VISIBILITY };
+  const [catGroups, brandGroups] = await Promise.all([
+    prisma.product.groupBy({
+      by: ["categoryId"],
+      where: scope,
+      _count: { _all: true },
+    }),
+    prisma.product.groupBy({
+      by: ["brandId"],
+      where: { ...scope, brandId: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const catCount = new Map(catGroups.map((g) => [g.categoryId, g._count._all]));
+  const brandCount = new Map(
+    brandGroups
+      .filter((g): g is typeof g & { brandId: string } => g.brandId !== null)
+      .map((g) => [g.brandId, g._count._all]),
+  );
+
+  const [cats, brands] = await Promise.all([
+    catCount.size
+      ? prisma.category.findMany({
+          where: { id: { in: [...catCount.keys()] } },
+          select: { id: true, name: true, slug: true },
+        })
+      : [],
+    brandCount.size
+      ? prisma.brand.findMany({
+          where: { id: { in: [...brandCount.keys()] } },
+          select: { id: true, name: true, slug: true },
+        })
+      : [],
+  ]);
+
+  const byCount = (a: StoreFacet, b: StoreFacet) =>
+    b.count - a.count || a.name.localeCompare(b.name);
+
+  return {
+    categories: cats
+      .map((c) => ({ name: c.name, slug: c.slug, count: catCount.get(c.id) ?? 0 }))
+      .sort(byCount),
+    brands: brands
+      .map((b) => ({ name: b.name, slug: b.slug, count: brandCount.get(b.id) ?? 0 }))
+      .sort(byCount),
   };
 }

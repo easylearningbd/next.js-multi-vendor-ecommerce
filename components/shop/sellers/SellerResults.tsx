@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/dashboard/Icon";
 import { getApprovedVendors, type VendorSort } from "@/lib/shop/queries";
 import { SellerCard } from "@/components/shop/sellers/SellerCard";
-import { SellerPagination } from "@/components/shop/sellers/SellerPagination";
+import { Pagination } from "@/components/shop/Pagination";
 
 /**
  * Async results for the seller list: fetches approved vendors and renders the
@@ -70,11 +70,11 @@ export async function SellerResults({
         ))}
       </div>
 
-      <SellerPagination
+      <Pagination
         page={current}
         totalPages={totalPages}
-        search={search}
-        sort={sort}
+        basePath="/sellers"
+        params={{ search: search || undefined, sort: sort !== "featured" ? sort : undefined }}
       />
     </div>
   );
