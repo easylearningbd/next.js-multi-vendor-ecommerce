@@ -29,6 +29,8 @@ const STORAGE_KEY = "covet-cart-v1";
 export type CartItem = {
   productId: string;
   variationId: string | null;
+  /** Human label for the chosen variation, e.g. "Size: M · Color: Red". */
+  variantLabel: string | null;
   name: string;
   slug: string;
   sellerStoreName: string;
@@ -50,23 +52,32 @@ export function lineKey(i: { productId: string; variationId: string | null }): s
   return `${i.productId}:${i.variationId ?? ""}`;
 }
 
-/** Build a cart line (minus qty) from any storefront product shape. */
+/**
+ * Build a cart line (minus qty) from any storefront product shape. Pass `opts`
+ * to override for a chosen variation (its id, label, own price, and image).
+ */
 export function toCartItem(
   product: Pick<
     StorefrontProduct,
     "id" | "name" | "slug" | "priceCents" | "thumbnail" | "seller"
   >,
-  variationId: string | null = null,
+  opts: {
+    variationId?: string | null;
+    variantLabel?: string | null;
+    priceCents?: number;
+    image?: string | null;
+  } = {},
 ): Omit<CartItem, "qty"> {
   return {
     productId: product.id,
-    variationId,
+    variationId: opts.variationId ?? null,
+    variantLabel: opts.variantLabel ?? null,
     name: product.name,
     slug: product.slug,
     sellerStoreName: product.seller.storeName,
     sellerSlug: product.seller.slug,
-    priceCents: product.priceCents,
-    image: product.thumbnail,
+    priceCents: opts.priceCents ?? product.priceCents,
+    image: opts.image !== undefined ? opts.image : product.thumbnail,
   };
 }
 
@@ -109,15 +120,22 @@ function reducer(state: CartItem[], action: Action): CartItem[] {
 /** Drop anything malformed from a persisted cart before trusting it. */
 function sanitize(raw: unknown): CartItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (i): i is CartItem =>
-      i != null &&
-      typeof i.productId === "string" &&
-      typeof i.priceCents === "number" &&
-      Number.isFinite(i.priceCents) &&
-      typeof i.qty === "number" &&
-      i.qty > 0,
-  );
+  return raw
+    .filter(
+      (i): i is CartItem =>
+        i != null &&
+        typeof i.productId === "string" &&
+        typeof i.priceCents === "number" &&
+        Number.isFinite(i.priceCents) &&
+        typeof i.qty === "number" &&
+        i.qty > 0,
+    )
+    // Normalize fields that may be absent in carts saved by an older version.
+    .map((i) => ({
+      ...i,
+      variationId: i.variationId ?? null,
+      variantLabel: i.variantLabel ?? null,
+    }));
 }
 
 const EMPTY: CartItem[] = [];

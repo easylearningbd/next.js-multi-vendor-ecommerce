@@ -483,6 +483,7 @@ export type CategoryPath = {
 
 export type ProductDetail = StorefrontProduct & {
   vendorId: string;
+  categoryId: string;
   sku: string | null;
   shortDescription: string | null;
   description: string;
@@ -521,6 +522,7 @@ export const getProductBySlug = cache(async function getProductBySlug(
       isFeatured: true,
       isPopular: true,
       createdAt: true,
+      categoryId: true,
       sku: true,
       shortDescription: true,
       description: true,
@@ -552,6 +554,7 @@ export const getProductBySlug = cache(async function getProductBySlug(
   return {
     ...card,
     vendorId: p.vendor.id,
+    categoryId: p.categoryId,
     sku: p.sku,
     shortDescription: p.shortDescription,
     description: p.description,

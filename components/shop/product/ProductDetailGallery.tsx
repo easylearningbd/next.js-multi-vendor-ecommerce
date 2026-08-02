@@ -4,23 +4,27 @@ import { useState } from "react";
 import { Icon } from "@/components/dashboard/Icon";
 
 /**
- * Product detail gallery — main image + thumbnail strip (real product images),
- * discount badge, share (copy link), and a local wishlist toggle.
+ * Product detail gallery — main image + thumbnail strip, discount badge, share
+ * (copy link), and a local wishlist toggle. The active/main image is CONTROLLED
+ * by the parent (ProductBuyBox) so selecting a variation can swap it.
  */
 export function ProductDetailGallery({
   images,
+  activeImage,
+  onSelectImage,
   productName,
   discountPercent,
 }: {
   images: string[];
+  activeImage: string | null;
+  onSelectImage: (src: string) => void;
   productName: string;
   discountPercent: number | null;
 }) {
-  const [active, setActive] = useState(0);
   const [wished, setWished] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const main = images[active];
+  const main = activeImage ?? images[0] ?? null;
 
   function share() {
     try {
@@ -81,11 +85,11 @@ export function ProductDetailGallery({
             <button
               key={src}
               type="button"
-              onClick={() => setActive(i)}
+              onClick={() => onSelectImage(src)}
               aria-label={`View image ${i + 1}`}
-              aria-pressed={i === active}
+              aria-pressed={src === main}
               className={`size-[70px] flex-none overflow-hidden rounded-xl border bg-field ${
-                i === active ? "border-iris-500" : "border-line-soft hover:border-iris-200"
+                src === main ? "border-iris-500" : "border-line-soft hover:border-iris-200"
               }`}
             >
               <img src={src} alt="" className="h-full w-full object-cover" />

@@ -139,6 +139,11 @@ function CartRow({ item }: { item: CartItem }) {
         <div className="line-clamp-2 font-sans text-[13px] font-medium leading-[1.35] text-ink">
           {item.name}
         </div>
+        {item.variantLabel && (
+          <div className="mt-0.5 font-sans text-[11px] text-muted">
+            {item.variantLabel}
+          </div>
+        )}
         <div className="mt-1 font-display text-[13px] font-bold text-ink">
           {formatCents(item.priceCents * item.qty)}
         </div>
