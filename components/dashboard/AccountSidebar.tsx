@@ -14,7 +14,7 @@ type NavItem = { label: string; icon: IconName; href?: string };
 const NAV_ITEMS: NavItem[] = [
   { label: "Profile Info", icon: "user", href: "/dashboard" },
   { label: "Change Password", icon: "lock", href: "/dashboard/change-password" },
-  { label: "My Orders", icon: "box" },
+  { label: "My Orders", icon: "box", href: "/dashboard/orders" },
   { label: "Restock Requests", icon: "refresh" },
   { label: "Wish List", icon: "heartLine" },
   { label: "My Wallet", icon: "wallet" },

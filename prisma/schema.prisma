@@ -74,6 +74,7 @@ model User {
   accounts Account[]
   sessions Session[]
   orders   Order[]
+  reviews  Review[]
 }
 
 model Vendor {
@@ -239,6 +240,7 @@ model Product {
   variations     ProductVariation[]
   couponProducts CouponProduct[]
   orderItems     OrderItem[]
+  reviews        Review[]
 
   @@index([vendorId])
   @@index([categoryId])
@@ -421,6 +423,9 @@ model Order {
   status        OrderStatus   @default(PENDING)
 
   note      String?  @db.Text
+  // Soft-hide from the CUSTOMER's own order list ("Hide from my list"). The order
+  // record stays fully intact for sales/vendor/reporting; null = visible.
+  hiddenAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -475,7 +480,44 @@ model OrderItem {
   // Restrict: a product referenced by orders is deactivated, not hard-deleted.
   product   Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
   variation ProductVariation? @relation(fields: [variationId], references: [id], onDelete: SetNull)
+  reviews   Review[]
 
   @@index([subOrderId])
   @@index([productId])
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A verified-buyer product review. `orderItemId` ties the review to a real
+/// purchased line, so only genuine buyers can review. Reviews start PENDING and
+/// are shown on the storefront only once an admin APPROVES them.
+model Review {
+  id          String @id @default(cuid())
+  productId   String
+  customerId  String
+  orderItemId String
+
+  rating  Int // 1–5, enforced in the server action + zod
+  title   String?
+  comment String  @db.Text
+  images  Json? // optional string[] of uploaded image paths
+
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+
+  // Cascade: a review is dependent data — it goes if the product, customer, or the
+  // purchased line it belongs to is ever removed.
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer  User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  // One review per purchased line item — a customer can't review the same purchase twice.
+  @@unique([customerId, orderItemId])
+  @@index([productId])
+  @@index([customerId])
+  @@index([status])
 }
