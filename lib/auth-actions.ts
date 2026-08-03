@@ -15,6 +15,11 @@ import {
   updateProfileSchema,
   vendorRegisterSchema,
 } from "@/lib/validation";
+import {
+  saveUserImage,
+  deleteUserImage,
+  FileValidationError,
+} from "@/lib/customer-profile-upload";
 
 export type FormState = {
   error?: string;
@@ -213,34 +218,80 @@ export async function updateProfile(
   const session = await auth();
   if (!session?.user?.id) return { error: "You must be signed in." };
 
+  const userId = session.user.id;
+
   const parsed = updateProfileSchema.safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
+    email: formData.get("email"),
     phone: formData.get("phone"),
-    newPassword: formData.get("newPassword"),
-    confirmPassword: formData.get("confirmPassword"),
+    image: formData.get("image"),
   });
 
   if (!parsed.success) {
-    return { fieldErrors: firstErrors(parsed.error.flatten().fieldErrors) };
+    return {
+      error: "Please fix the highlighted fields.",
+      fieldErrors: firstErrors(parsed.error.flatten().fieldErrors),
+    };
   }
 
-  const { firstName, lastName, phone, newPassword } = parsed.data;
+  const { firstName, lastName, email, phone, image } = parsed.data;
   const name = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-  const data: { name: string; phone: string | null; passwordHash?: string } = {
-    name,
-    phone: phone ? phone : null,
-  };
-  if (newPassword) {
-    data.passwordHash = await bcrypt.hash(newPassword, 12);
+  // Email must not collide with ANOTHER user's account.
+  const clash = await prisma.user.findFirst({
+    where: { email, NOT: { id: userId } },
+    select: { id: true },
+  });
+  if (clash) {
+    return {
+      error: "That email is already in use.",
+      fieldErrors: { email: "That email is already in use" },
+    };
   }
 
+  // Current image, so we can delete it AFTER a successful replace/remove.
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { image: true },
+  });
+
+  // Persist a new image (if any) BEFORE the DB write; roll it back on failure.
+  let newImage: string | undefined;
   try {
-    await prisma.user.update({ where: { id: session.user.id }, data });
-  } catch {
+    if (image) newImage = await saveUserImage(image);
+  } catch (e) {
+    if (e instanceof FileValidationError) {
+      return { error: e.message, fieldErrors: { image: e.message } };
+    }
+    return { error: "Could not process the uploaded image. Please try again." };
+  }
+
+  // A new upload always takes precedence over an explicit remove.
+  const removeImage = !newImage && formData.get("removeImage") === "true";
+
+  const data: Prisma.UserUpdateInput = {
+    name,
+    email,
+    phone: phone ? phone : null,
+    ...(newImage ? { image: newImage } : removeImage ? { image: null } : {}),
+  };
+
+  try {
+    await prisma.user.update({ where: { id: userId }, data });
+  } catch (e) {
+    if (newImage) await deleteUserImage(newImage); // roll back the just-saved file
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return {
+        error: "That email is already in use.",
+        fieldErrors: { email: "That email is already in use" },
+      };
+    }
     return { error: "Couldn't save your profile. Please try again." };
   }
+
+  // Commit succeeded — delete the previous image that was replaced or removed.
+  if (newImage || removeImage) await deleteUserImage(current?.image);
 
   revalidatePath("/dashboard");
   return {};

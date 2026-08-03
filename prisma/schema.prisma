@@ -63,6 +63,9 @@ model User {
   // Collected on vendor onboarding (VendorRegister design has a Phone field);
   // optional so customer/admin accounts don't require it.
   phone        String?
+  // Profile photo — public path like /uploads/users/<uuid>.jpg (nullable; most
+  // accounts have none). Managed by the customer dashboard profile update.
+  image        String?
   role         Role     @default(CUSTOMER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

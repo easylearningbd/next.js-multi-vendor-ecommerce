@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_IMAGE_BYTES, ACCEPTED_IMAGE_MIME } from "@/lib/brand-validation";
 
 const password = z
   .string()
@@ -35,22 +36,35 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Enter your password"),
 });
 
-export const updateProfileSchema = z
-  .object({
-    firstName: z.string().trim().min(1, "First name is required").max(60),
-    lastName: z.string().trim().max(60).optional().or(z.literal("")),
-    phone: z.string().trim().max(30).optional().or(z.literal("")),
-    newPassword: z.string().max(72).optional().or(z.literal("")),
-    confirmPassword: z.string().optional().or(z.literal("")),
-  })
-  .refine((d) => !d.newPassword || d.newPassword.length >= 8, {
-    message: "Password must be at least 8 characters long",
-    path: ["newPassword"],
-  })
-  .refine((d) => !d.newPassword || d.newPassword === d.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+// An unset file input arrives as a zero-byte File (or absent as null) — treat
+// either as "no new image" (keep the existing one).
+const emptyImageToUndefined = (v: unknown) =>
+  v == null || (v instanceof File && v.size === 0) ? undefined : v;
+
+// Optional profile photo. `file.type` is the client-reported MIME and is only a
+// first-pass guard — the upload handler additionally sniffs magic bytes.
+const optionalProfileImage = z.preprocess(
+  emptyImageToUndefined,
+  z
+    .instanceof(File, { message: "Please choose an image file" })
+    .refine((f) => f.size <= MAX_IMAGE_BYTES, "Image must be 2MB or smaller")
+    .refine(
+      (f) => (ACCEPTED_IMAGE_MIME as readonly string[]).includes(f.type),
+      "Only JPG, PNG or WebP images are allowed",
+    )
+    .optional(),
+);
+
+// Profile update (customer dashboard). Password is handled separately by the
+// change-password flow. Email uniqueness is enforced server-side against the
+// session user (needs DB + auth); this only checks shape.
+export const updateProfileSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(60),
+  lastName: z.string().trim().max(60).optional().or(z.literal("")),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  image: optionalProfileImage,
+});
 
 export type CustomerRegisterInput = z.infer<typeof customerRegisterSchema>;
 export type VendorRegisterInput = z.infer<typeof vendorRegisterSchema>;
