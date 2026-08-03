@@ -671,23 +671,50 @@ export type ProductReviews = {
   reviews: ProductReview[];
 };
 
+const REVIEW_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+
 /**
- * Product reviews. TODO(reviews): there is no Review model in the schema yet, so
- * this returns an empty summary and the UI renders a "No reviews yet" state.
- * When a Review model lands, query it here (by productId) and populate the same
- * shape — the reviews UI already consumes it. `productId` is accepted now so the
- * call sites don't change later.
+ * Public product reviews — APPROVED only (PENDING/REJECTED never reach shoppers).
+ * The product's displayed rating is the mean of these approved reviews, so it is
+ * recomputed on every load (and on revalidation after an admin approves/rejects).
  */
-export async function getProductReviews(
-  productId: string,
-): Promise<ProductReviews> {
-  void productId;
-  return {
-    average: null,
-    count: 0,
-    distribution: [5, 4, 3, 2, 1].map((stars) => ({ stars, count: 0 })),
-    reviews: [],
-  };
+export async function getProductReviews(productId: string): Promise<ProductReviews> {
+  const rows = await prisma.review.findMany({
+    where: { productId, status: "APPROVED" },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      rating: true,
+      comment: true,
+      images: true,
+      createdAt: true,
+      customer: { select: { name: true, image: true } },
+    },
+  });
+
+  const count = rows.length;
+  const average = count
+    ? Math.round((rows.reduce((s, r) => s + r.rating, 0) / count) * 10) / 10
+    : null;
+  const distribution = [5, 4, 3, 2, 1].map((stars) => ({
+    stars,
+    count: rows.filter((r) => r.rating === stars).length,
+  }));
+  const reviews: ProductReview[] = rows.map((r) => ({
+    id: r.id,
+    author: r.customer.name,
+    avatar: r.customer.image,
+    rating: r.rating,
+    date: REVIEW_DATE_FMT.format(r.createdAt),
+    text: r.comment,
+    photos: Array.isArray(r.images) ? (r.images as string[]) : [],
+  }));
+
+  return { average, count, distribution, reviews };
 }
 
 /* ------------------------------------------------------------------ */

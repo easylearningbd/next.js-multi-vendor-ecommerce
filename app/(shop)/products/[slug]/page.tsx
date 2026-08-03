@@ -67,7 +67,11 @@ export default async function ProductPage({ params }: { params: Params }) {
       <div className="mx-auto grid max-w-[var(--container-max)] grid-cols-1 items-start gap-6 px-[var(--cpad)] pt-[18px] lg:grid-cols-[1fr_336px]">
         <div className="flex flex-col gap-6">
           {/* Gallery + info + variation-aware purchase panel */}
-          <ProductBuyBox product={product} />
+          <ProductBuyBox
+            product={product}
+            rating={reviews.average}
+            reviewCount={reviews.count}
+          />
 
           {/* Overview / Reviews tabs */}
           <ProductTabs

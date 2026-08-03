@@ -43,7 +43,16 @@ function findMatch(
  * and gallery image; Add to Cart pushes the chosen variation (id + label + its
  * own price) into the shared cart store. All money math is integer cents.
  */
-export function ProductBuyBox({ product }: { product: ProductDetail }) {
+export function ProductBuyBox({
+  product,
+  rating,
+  reviewCount = 0,
+}: {
+  product: ProductDetail;
+  /** Live average from APPROVED reviews (recomputed per load). */
+  rating?: number | null;
+  reviewCount?: number;
+}) {
   const router = useRouter();
   const { addItem } = useCart();
 
@@ -135,7 +144,8 @@ export function ProductBuyBox({ product }: { product: ProductDetail }) {
     router.push("/checkout");
   }
 
-  const filledStars = Math.round(product.rating ?? 0);
+  const effectiveRating = rating ?? product.rating ?? null;
+  const filledStars = Math.round(effectiveRating ?? 0);
 
   return (
     <div className="grid grid-cols-1 gap-9 rounded-[20px] border border-line-soft bg-surface p-7 shadow-[0_1px_2px_rgba(20,18,31,0.05)] md:grid-cols-[400px_1fr]">
@@ -167,7 +177,11 @@ export function ProductBuyBox({ product }: { product: ProductDetail }) {
                 />
               ))}
             </span>
-            <span className="font-medium text-muted">No reviews yet</span>
+            <span className="font-medium text-muted">
+              {reviewCount > 0 && effectiveRating != null
+                ? `${effectiveRating.toFixed(1)} · ${reviewCount} review${reviewCount === 1 ? "" : "s"}`
+                : "No reviews yet"}
+            </span>
           </span>
           {product.brand && (
             <>

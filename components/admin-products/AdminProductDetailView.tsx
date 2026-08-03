@@ -1,10 +1,11 @@
 import Link from "next/link";
-import type { AdminProductDetail } from "@/lib/admin-product-types";
+import type { AdminProductDetail, AdminReviewItem } from "@/lib/admin-product-types";
 import { Icon } from "@/components/dashboard/Icon";
 import { ProductGallery } from "@/components/products/ProductGallery";
 import { AdminProductStatusBadge } from "./AdminProductStatusBadge";
 import { AdminProductActions } from "./AdminProductActions";
 import { AdminFlagToggles } from "./AdminFlagToggles";
+import { ReviewModerationList } from "./ReviewModerationList";
 
 const money = (s: string) => `$${Number(s).toFixed(2)}`;
 const fmtDate = (d: Date) =>
@@ -33,7 +34,13 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function AdminProductDetailView({ product: p }: { product: AdminProductDetail }) {
+export function AdminProductDetailView({
+  product: p,
+  reviews,
+}: {
+  product: AdminProductDetail;
+  reviews: AdminReviewItem[];
+}) {
   const categoryPath = [p.categoryName, p.subCategoryName, p.subSubCategoryName].filter(Boolean).join("  ›  ");
   const discountLabel =
     p.discount != null ? (p.discountType === "PERCENT" ? `${Number(p.discount)}% off` : `${money(p.discount)} off`) : null;
@@ -175,19 +182,10 @@ export function AdminProductDetailView({ product: p }: { product: AdminProductDe
         </div>
       </Card>
 
-      {/* Product Reviews — PLACEHOLDER. The reviews table/logic renders here later.
-          TODO(reviews): fetch + render product reviews (reviewer, rating, review, reply,
-          date, status, actions) once the review system is built. Do NOT build it now. */}
+      {/* Product Reviews — moderation. Approve makes a review public on the
+          storefront + recomputes the product rating; Reject hides it. */}
       <Card title="Product Reviews" icon="star">
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-line bg-bg-subtle px-6 py-12 text-center">
-          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-iris-50 text-iris-400">
-            <Icon name="message" size={22} strokeWidth={1.7} />
-          </span>
-          <div className="font-display text-[15px] font-bold text-ink">Reviews coming soon</div>
-          <p className="mx-auto mt-2 max-w-[360px] font-sans text-[13px] leading-[1.5] text-muted">
-            Customer reviews for this product will appear here once the review system is available.
-          </p>
-        </div>
+        <ReviewModerationList reviews={reviews} />
       </Card>
     </div>
   );

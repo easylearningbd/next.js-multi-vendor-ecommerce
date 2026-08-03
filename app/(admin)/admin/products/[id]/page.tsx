@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdminProductDetailView } from "@/components/admin-products/AdminProductDetailView";
-import { getAdminProductDetail } from "../actions";
+import { getAdminProductDetail, getAdminProductReviews } from "../actions";
 
 export const metadata: Metadata = { title: "Product Details — Covet Admin" };
 
@@ -13,5 +13,8 @@ export default async function AdminProductDetailPage({ params }: { params: Promi
 
   if (!res.success || !res.data) notFound();
 
-  return <AdminProductDetailView product={res.data} />;
+  const reviewsRes = await getAdminProductReviews(id);
+  const reviews = reviewsRes.success ? (reviewsRes.data ?? []) : [];
+
+  return <AdminProductDetailView product={res.data} reviews={reviews} />;
 }

@@ -11,6 +11,7 @@ import type {
   AdminProductFilter,
   AdminProductListItem,
   AdminProductsQuery,
+  AdminReviewItem,
   Option,
   Paginated,
 } from "@/lib/admin-product-types";
@@ -298,4 +299,74 @@ export async function deleteAdminProduct(id: string): Promise<ActionResult<{ sof
   } catch {
     return { success: false, error: "Couldn't delete the product. Please try again." };
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Review moderation (admin-only). Approving a review makes it appear on the
+// storefront product page; rejecting hides it. The product's public rating is
+// recomputed from APPROVED reviews on load, so revalidating the product page is
+// enough — there is no cached rating column to update.
+// ─────────────────────────────────────────────────────────────
+export async function getAdminProductReviews(
+  productId: string,
+): Promise<ActionResult<AdminReviewItem[]>> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const rows = await prisma.review.findMany({
+    where: { productId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      rating: true,
+      title: true,
+      comment: true,
+      images: true,
+      createdAt: true,
+      status: true,
+      customer: { select: { name: true, image: true } },
+    },
+  });
+  return {
+    success: true,
+    data: rows.map((r) => ({
+      id: r.id,
+      author: r.customer.name,
+      avatar: r.customer.image,
+      rating: r.rating,
+      title: r.title,
+      comment: r.comment,
+      photos: Array.isArray(r.images) ? (r.images as string[]) : [],
+      date: fmtDate(r.createdAt),
+      status: r.status,
+    })),
+  };
+}
+
+async function setReviewStatus(
+  reviewId: string,
+  status: "APPROVED" | "REJECTED",
+): Promise<ActionResult> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: { productId: true, product: { select: { slug: true } } },
+  });
+  if (!review) return { success: false, error: "Review not found." };
+  try {
+    await prisma.review.update({ where: { id: reviewId }, data: { status } });
+  } catch {
+    return { success: false, error: "Couldn't update the review. Please try again." };
+  }
+  revalidatePath(`/admin/products/${review.productId}`);
+  revalidatePath(`/products/${review.product.slug}`);
+  return { success: true };
+}
+
+export async function approveReview(reviewId: string): Promise<ActionResult> {
+  return setReviewStatus(reviewId, "APPROVED");
+}
+
+export async function rejectReview(reviewId: string): Promise<ActionResult> {
+  return setReviewStatus(reviewId, "REJECTED");
 }

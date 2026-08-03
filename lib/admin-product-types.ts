@@ -74,3 +74,15 @@ export type AdminProductDetail = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type AdminReviewItem = {
+  id: string;
+  author: string;
+  avatar: string | null;
+  rating: number;
+  title: string | null;
+  comment: string;
+  photos: string[];
+  date: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+};
