@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/components/dashboard/Icon";
 import { formatCents } from "@/lib/shop/pricing";
 import { useCart, toCartItem } from "@/components/shop/cart/CartProvider";
+import { useWishlist } from "@/components/shop/wishlist/WishlistProvider";
 import type { QuickViewProduct } from "@/lib/shop/queries";
 
 export type QuickViewStatus = "loading" | "loaded" | "error";
@@ -74,6 +75,8 @@ function QuickViewBody({ product }: { product: QuickViewProduct }) {
     (x): x is string => !!x,
   ))];
   const { addItem } = useCart();
+  const { has, toggle } = useWishlist();
+  const wished = has(product.id);
   const [active, setActive] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -229,6 +232,20 @@ function QuickViewBody({ product }: { product: QuickViewProduct }) {
           >
             View details
           </Link>
+          <button
+            type="button"
+            onClick={() => toggle(product.id)}
+            aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={wished}
+            className="flex size-[52px] flex-none items-center justify-center rounded-xl border border-line transition-colors hover:border-iris-500"
+          >
+            <Icon
+              name={wished ? "heart" : "heartLine"}
+              size={20}
+              strokeWidth={2}
+              className={wished ? "text-error" : "text-muted"}
+            />
+          </button>
         </div>
 
       </div>

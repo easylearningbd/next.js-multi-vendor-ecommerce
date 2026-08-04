@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/components/dashboard/Icon";
 import { useQuickView } from "@/components/shop/quick-view/QuickViewProvider";
 import { useCart, toCartItem } from "@/components/shop/cart/CartProvider";
+import { useWishlist } from "@/components/shop/wishlist/WishlistProvider";
 import type { StorefrontProduct } from "@/lib/shop/queries";
 
 /**
@@ -22,7 +23,8 @@ import type { StorefrontProduct } from "@/lib/shop/queries";
 export function ProductCard({ product }: { product: StorefrontProduct }) {
   const quickView = useQuickView();
   const { addItem } = useCart();
-  const [wished, setWished] = useState(false);
+  const { has, toggle } = useWishlist();
+  const wished = has(product.id);
   const [added, setAdded] = useState(false);
 
   const href = `/products/${product.slug}`;
@@ -80,7 +82,7 @@ export function ProductCard({ product }: { product: StorefrontProduct }) {
 
         <button
           type="button"
-          onClick={() => setWished((w) => !w)}
+          onClick={() => toggle(product.id)}
           aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
           aria-pressed={wished}
           className="absolute right-2.5 top-2.5 z-[3] flex size-9 items-center justify-center rounded-full border-none bg-white/90 shadow-[0_2px_8px_rgba(20,18,31,0.1)] backdrop-blur-sm transition-transform hover:scale-110"

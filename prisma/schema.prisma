@@ -75,6 +75,7 @@ model User {
   sessions Session[]
   orders   Order[]
   reviews  Review[]
+  wishlist Wishlist[]
 }
 
 model Vendor {
@@ -241,6 +242,7 @@ model Product {
   couponProducts CouponProduct[]
   orderItems     OrderItem[]
   reviews        Review[]
+  wishlist       Wishlist[]
 
   @@index([vendorId])
   @@index([categoryId])
@@ -520,4 +522,22 @@ model Review {
   @@index([productId])
   @@index([customerId])
   @@index([status])
+}
+
+/// A customer's saved (wishlisted) product. Login-required; one row per
+/// (customer, product) — a product can't be wishlisted twice by one user.
+model Wishlist {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  // Cascade: a wishlist row is dependent data — it goes if the customer or the
+  // product it points to is ever removed.
+  customer User    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+  @@index([productId])
 }
