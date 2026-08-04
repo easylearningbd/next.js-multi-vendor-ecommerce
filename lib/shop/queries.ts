@@ -96,7 +96,7 @@ export const getStorefrontCategoryTree = cache(async function getStorefrontCateg
 /* ------------------------------------------------------------------ */
 
 /** Shared column set for product cards — keeps every list query consistent. */
-const CARD_SELECT = {
+export const CARD_SELECT = {
   id: true,
   name: true,
   slug: true,
@@ -115,7 +115,7 @@ const CARD_SELECT = {
   variations: { select: { stock: true } },
 } satisfies Prisma.ProductSelect;
 
-type CardRow = Prisma.ProductGetPayload<{ select: typeof CARD_SELECT }>;
+export type CardRow = Prisma.ProductGetPayload<{ select: typeof CARD_SELECT }>;
 
 /** The card shape every storefront product list returns. Money is display-ready. */
 export type StorefrontProduct = {
@@ -142,7 +142,7 @@ export type StorefrontProduct = {
   createdAt: string;
 };
 
-function toCard(p: CardRow): StorefrontProduct {
+export function toCard(p: CardRow): StorefrontProduct {
   const hasVariations = p.variations.length > 0;
   const variationStock = p.variations.reduce((sum, v) => sum + v.stock, 0);
   const inStock = hasVariations ? variationStock > 0 : p.stock > 0;

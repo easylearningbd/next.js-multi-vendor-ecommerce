@@ -20,6 +20,8 @@ type WishlistContextValue = {
   has: (productId: string) => boolean;
   /** Add/remove a product; optimistic, with a sign-in prompt for guests. */
   toggle: (productId: string) => void;
+  /** Reflect a removal done elsewhere (e.g. the wishlist page) on the hearts. */
+  markRemoved: (productId: string) => void;
 };
 
 const WishlistContext = createContext<WishlistContextValue | null>(null);
@@ -113,9 +115,18 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     [ids, hydrated, isLoggedIn, promptSignIn],
   );
 
+  const markRemoved = useCallback((productId: string) => {
+    setIds((prev) => {
+      if (!prev.has(productId)) return prev;
+      const next = new Set(prev);
+      next.delete(productId);
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ hydrated, isLoggedIn, has, toggle }),
-    [hydrated, isLoggedIn, has, toggle],
+    () => ({ hydrated, isLoggedIn, has, toggle, markRemoved }),
+    [hydrated, isLoggedIn, has, toggle, markRemoved],
   );
 
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;

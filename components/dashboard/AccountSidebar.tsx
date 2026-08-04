@@ -16,7 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Change Password", icon: "lock", href: "/dashboard/change-password" },
   { label: "My Orders", icon: "box", href: "/dashboard/orders" },
   { label: "Restock Requests", icon: "refresh" },
-  { label: "Wish List", icon: "heartLine" },
+  { label: "Wish List", icon: "heartLine", href: "/dashboard/wishlist" },
   { label: "My Wallet", icon: "wallet" },
   { label: "My Loyalty Point", icon: "award" },
   { label: "Inbox", icon: "mail" },
