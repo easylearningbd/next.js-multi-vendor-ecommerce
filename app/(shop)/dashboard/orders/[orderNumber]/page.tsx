@@ -284,6 +284,13 @@ export default async function OrderDetailsPage({
             <Icon name="chevronLeft" size={14} strokeWidth={2.2} />
             All orders
           </Link>
+          <Link
+            href={`/dashboard/track-order?order=${order.orderNumber}`}
+            className="flex h-10 items-center gap-1.5 rounded-[11px] border border-line px-3.5 font-sans text-[13px] font-medium text-ink-soft transition-colors hover:border-iris-500 hover:text-iris-500"
+          >
+            <Icon name="truck" size={15} strokeWidth={2} />
+            Track order
+          </Link>
           <a
             href={`/invoice/${order.orderNumber}`}
             target="_blank"

@@ -24,7 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Support Ticket", icon: "life" },
   { label: "Refer & Earn", icon: "share" },
   { label: "Coupons", icon: "ticket" },
-  { label: "Track Order", icon: "truck" },
+  { label: "Track Order", icon: "truck", href: "/dashboard/track-order" },
 ];
 
 const ROW_BASE =
