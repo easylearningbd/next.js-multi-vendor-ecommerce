@@ -66,10 +66,14 @@ export async function OrderReviewsPanel({
   orderNumber: string;
   customerId: string;
 }) {
-  const data = await getReviewableItems(orderNumber, customerId);
-  if (!data) return null;
+  const items = await getReviewableItems(orderNumber, customerId);
+  if (!items) return null;
 
-  if (data.status !== "DELIVERED") {
+  // Reviews unlock PER SELLER: an item is reviewable once its sub-order is delivered.
+  const reviewable = items.filter((i) => i.delivered);
+  const pending = items.filter((i) => !i.delivered);
+
+  if (reviewable.length === 0) {
     return (
       <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-8 py-14 text-center">
         <span className="mb-[18px] flex size-16 items-center justify-center rounded-[18px] bg-iris-50 text-iris-400">
@@ -92,7 +96,7 @@ export async function OrderReviewsPanel({
         </p>
       </div>
       <div className="flex flex-col gap-4">
-        {data.items.map((item) =>
+        {reviewable.map((item) =>
           item.review ? (
             <ReviewedCard
               key={item.orderItemId}
@@ -103,6 +107,12 @@ export async function OrderReviewsPanel({
           ),
         )}
       </div>
+      {pending.length > 0 && (
+        <p className="mt-4 font-sans text-[12.5px] text-muted-soft">
+          {pending.length} more {pending.length === 1 ? "item" : "items"} can be reviewed once
+          delivered.
+        </p>
+      )}
     </div>
   );
 }

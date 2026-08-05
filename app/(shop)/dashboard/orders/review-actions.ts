@@ -80,11 +80,13 @@ export async function submitReview(
   const d = parsed.data;
 
   // Verified-buyer + product-match + DELIVERED, all enforced by this scoped lookup.
+  // Delivery is per SELLER: the item's own sub-order must be DELIVERED (the parent
+  // order has no single status — vendors update SubOrder.status).
   const item = await prisma.orderItem.findFirst({
     where: {
       id: d.orderItemId,
       productId: d.productId,
-      subOrder: { order: { customerId: uid, status: "DELIVERED" } },
+      subOrder: { status: "DELIVERED", order: { customerId: uid } },
     },
     select: { id: true, subOrder: { select: { order: { select: { orderNumber: true } } } } },
   });

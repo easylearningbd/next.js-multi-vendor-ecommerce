@@ -1,6 +1,7 @@
 import type { OrderStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { deriveOrderStatus } from "@/lib/shop/tracking";
 
 export const ORDERS_PAGE_SIZE = 8;
 
@@ -57,7 +58,6 @@ export async function getCustomerOrders(
   const where: Prisma.OrderWhereInput = {
     customerId,
     hiddenAt: null,
-    ...(opts.status ? { status: opts.status } : {}),
     ...(q
       ? {
           OR: [
@@ -68,44 +68,51 @@ export async function getCustomerOrders(
       : {}),
   };
 
-  const [total, rows] = await Promise.all([
-    prisma.order.count({ where }),
-    prisma.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * ORDERS_PAGE_SIZE,
-      take: ORDERS_PAGE_SIZE,
-      select: {
-        orderNumber: true,
-        createdAt: true,
-        status: true,
-        paymentStatus: true,
-        paymentMethod: true,
-        grandTotal: true,
-        subOrders: {
-          select: {
-            vendor: { select: { storeName: true } },
-            items: { select: { qty: true } },
-          },
+  // The parent Order.status is stale after placement — vendors only update their
+  // own SubOrder.status. So we derive the customer-facing status from the
+  // sub-orders (least-advanced = the order is only as far as its slowest seller).
+  // Because the display status is computed, the status filter and pagination must
+  // run in JS, not SQL. Customer order sets are small, so this is cheap.
+  const rows = await prisma.order.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    select: {
+      orderNumber: true,
+      createdAt: true,
+      paymentStatus: true,
+      paymentMethod: true,
+      grandTotal: true,
+      subOrders: {
+        select: {
+          status: true,
+          vendor: { select: { storeName: true } },
+          items: { select: { qty: true } },
         },
       },
-    }),
-  ]);
+    },
+  });
 
-  const orders: CustomerOrderSummary[] = rows.map((o) => ({
-    orderNumber: o.orderNumber,
-    createdAt: o.createdAt,
-    status: o.status,
-    paymentStatus: o.paymentStatus,
-    paymentMethod: o.paymentMethod,
-    grandTotal: o.grandTotal.toString(),
-    itemCount: o.subOrders.reduce(
-      (sum, s) => sum + s.items.reduce((n, i) => n + i.qty, 0),
-      0,
-    ),
-    sellerNames: [...new Set(o.subOrders.map((s) => s.vendor.storeName))],
-    cancellable: isCancellable(o.status),
-  }));
+  const all: CustomerOrderSummary[] = rows.map((o) => {
+    const status = deriveOrderStatus(o.subOrders.map((s) => s.status));
+    return {
+      orderNumber: o.orderNumber,
+      createdAt: o.createdAt,
+      status,
+      paymentStatus: o.paymentStatus,
+      paymentMethod: o.paymentMethod,
+      grandTotal: o.grandTotal.toString(),
+      itemCount: o.subOrders.reduce(
+        (sum, s) => sum + s.items.reduce((n, i) => n + i.qty, 0),
+        0,
+      ),
+      sellerNames: [...new Set(o.subOrders.map((s) => s.vendor.storeName))],
+      cancellable: isCancellable(status),
+    };
+  });
+
+  const filtered = opts.status ? all.filter((o) => o.status === opts.status) : all;
+  const total = filtered.length;
+  const orders = filtered.slice((page - 1) * ORDERS_PAGE_SIZE, page * ORDERS_PAGE_SIZE);
 
   return {
     orders,

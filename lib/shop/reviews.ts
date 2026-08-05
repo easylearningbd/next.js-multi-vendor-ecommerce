@@ -1,4 +1,4 @@
-import type { OrderStatus, ReviewStatus } from "@prisma/client";
+import type { ReviewStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type ReviewableItem = {
@@ -9,26 +9,28 @@ export type ReviewableItem = {
   slug: string | null;
   thumbnail: string | null;
   sellerName: string;
+  /** True once THIS item's sub-order (its seller) is delivered — reviews are per-seller. */
+  delivered: boolean;
   review: { status: ReviewStatus; rating: number } | null;
 };
 
 /**
  * Everything the order-details Reviews tab needs, scoped to the signed-in
- * customer: the order status (gates whether reviews are allowed) and each
- * purchased line with its existing review (if the customer already left one).
+ * customer: each purchased line, whether its SELLER's sub-order is delivered
+ * (reviews unlock per seller, not for the whole order), and any existing review.
  * Returns null when the order isn't this customer's / doesn't exist.
  */
 export async function getReviewableItems(
   orderNumber: string,
   customerId: string,
-): Promise<{ status: OrderStatus; items: ReviewableItem[] } | null> {
+): Promise<ReviewableItem[] | null> {
   const order = await prisma.order.findFirst({
     where: { orderNumber, customerId },
     select: {
-      status: true,
       subOrders: {
         orderBy: { createdAt: "asc" },
         select: {
+          status: true,
           vendor: { select: { storeName: true } },
           items: {
             orderBy: { createdAt: "asc" },
@@ -53,7 +55,7 @@ export async function getReviewableItems(
 
   if (!order) return null;
 
-  const items: ReviewableItem[] = order.subOrders.flatMap((s) =>
+  return order.subOrders.flatMap((s) =>
     s.items.map((it) => ({
       orderItemId: it.id,
       productId: it.productId,
@@ -62,9 +64,8 @@ export async function getReviewableItems(
       slug: it.product?.slug ?? null,
       thumbnail: it.product?.thumbnail ?? null,
       sellerName: s.vendor.storeName,
+      delivered: s.status === "DELIVERED",
       review: it.reviews[0] ?? null,
     })),
   );
-
-  return { status: order.status, items };
 }
