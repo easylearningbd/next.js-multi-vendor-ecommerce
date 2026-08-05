@@ -5,6 +5,7 @@ import { Icon } from "@/components/dashboard/Icon";
 import { formatMoney } from "@/lib/shop/pricing";
 import { getConfirmationOrder } from "@/lib/shop/order";
 import { isCancellable } from "@/lib/shop/customer-orders";
+import { deriveOrderStatus } from "@/lib/shop/tracking";
 import {
   OrderStatusBadge,
   PaymentStatusBadge,
@@ -46,6 +47,10 @@ export default async function OrderDetailsPage({
     0,
   );
   const cancellable = isCancellable(order.status);
+  // The order-level status shown to the customer is derived from the vendors'
+  // sub-order statuses (the shared field vendors write), so their updates surface
+  // here — the parent Order.status alone would be stale.
+  const overallStatus = deriveOrderStatus(order.subOrders.map((s) => s.status));
 
   const infoRow = (label: string, value: React.ReactNode) => (
     <div className="flex items-center justify-between gap-4 py-2 font-sans text-[13.5px]">
@@ -62,7 +67,7 @@ export default async function OrderDetailsPage({
           <div className="mb-2 font-display text-[15px] font-bold text-ink">Order Info</div>
           {infoRow("Payment status", <PaymentStatusBadge status={order.paymentStatus} />)}
           {infoRow("Payment method", paymentLabel)}
-          {infoRow("Order status", <OrderStatusBadge status={order.status} />)}
+          {infoRow("Order status", <OrderStatusBadge status={overallStatus} />)}
         </div>
         <div className="rounded-2xl border border-line-soft p-6">
           <div className="mb-4 font-display text-sm font-bold text-ink">Shipping Address</div>
@@ -141,12 +146,15 @@ export default async function OrderDetailsPage({
                     </Link>
                   </div>
                 </div>
-                <Link
-                  href={`/sellers/${sub.vendor.slug}`}
-                  className="flex h-9 items-center rounded-[10px] bg-surface px-3.5 font-sans text-[12.5px] font-semibold text-ink-soft transition-colors hover:bg-iris-100 hover:text-accent-fg"
-                >
-                  Visit store
-                </Link>
+                <div className="flex items-center gap-2.5">
+                  <OrderStatusBadge status={sub.status} />
+                  <Link
+                    href={`/sellers/${sub.vendor.slug}`}
+                    className="flex h-9 items-center rounded-[10px] bg-surface px-3.5 font-sans text-[12.5px] font-semibold text-ink-soft transition-colors hover:bg-iris-100 hover:text-accent-fg"
+                  >
+                    Visit store
+                  </Link>
+                </div>
               </div>
 
               {/* Items */}
@@ -255,7 +263,7 @@ export default async function OrderDetailsPage({
     </div>
   );
 
-  const trackPanel = <OrderTimeline status={order.status} createdAt={order.createdAt} />;
+  const trackPanel = <OrderTimeline status={overallStatus} createdAt={order.createdAt} />;
 
   const reviewsPanel = (
     <OrderReviewsPanel orderNumber={order.orderNumber} customerId={session.user.id} />
@@ -270,7 +278,7 @@ export default async function OrderDetailsPage({
             <h1 className="font-display text-[22px] font-bold tracking-[-0.01em] text-ink">
               Order {order.orderNumber}
             </h1>
-            <OrderStatusBadge status={order.status} />
+            <OrderStatusBadge status={overallStatus} />
           </div>
           <div className="mt-2.5 font-sans text-[12.5px] text-muted-soft">
             {DATE_FMT.format(order.createdAt)}

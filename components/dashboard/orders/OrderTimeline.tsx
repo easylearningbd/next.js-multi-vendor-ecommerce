@@ -17,7 +17,7 @@ const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-type StepState = "done" | "current" | "pending" | "canceled" | "returned";
+type StepState = "done" | "current" | "pending" | "canceled" | "returned" | "failed";
 type Step = { label: string; state: StepState; time: string };
 
 const DOT: Record<StepState, string> = {
@@ -26,11 +26,13 @@ const DOT: Record<StepState, string> = {
   pending: "bg-line text-transparent",
   canceled: "bg-error text-white",
   returned: "bg-info text-white",
+  failed: "bg-error text-white",
 };
 const DOT_ICON: Partial<Record<StepState, IconName>> = {
   done: "check",
   canceled: "x",
   returned: "refresh",
+  failed: "alert",
 };
 
 // We don't keep a per-status history, so only "Order placed" has a real time;
@@ -42,6 +44,17 @@ function buildSteps(status: OrderStatus, createdAt: Date): Step[] {
     return [
       { label: "Order placed", state: "done", time: placedTime },
       { label: "Order canceled", state: "canceled", time: "This order was canceled" },
+    ];
+  }
+
+  if (status === "FAILED_TO_DELIVER") {
+    return [
+      ...FLOW.slice(0, 4).map((s, i) => ({
+        label: s.label,
+        state: "done" as const,
+        time: i === 0 ? placedTime : "Completed",
+      })),
+      { label: "Delivery failed", state: "failed", time: "The delivery attempt failed" },
     ];
   }
 

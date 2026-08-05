@@ -20,6 +20,27 @@ export function statusFromSlug(slug?: string): OrderStatus | undefined {
   return slug ? STATUS_BY_SLUG[slug] : undefined;
 }
 
+/**
+ * Allowed forward transitions for a vendor updating a sub-order. Prevents going
+ * backwards (e.g. DELIVERED → PENDING) and models the terminal states:
+ * CANCELED / RETURNED accept no further change. Shared by the update action AND
+ * the status <select> so they can never disagree.
+ */
+export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ["CONFIRMED", "CANCELED"],
+  CONFIRMED: ["PACKAGING", "CANCELED"],
+  PACKAGING: ["OUT_FOR_DELIVERY", "CANCELED"],
+  OUT_FOR_DELIVERY: ["DELIVERED", "FAILED_TO_DELIVER"],
+  DELIVERED: ["RETURNED"],
+  FAILED_TO_DELIVER: ["OUT_FOR_DELIVERY", "CANCELED"],
+  CANCELED: [],
+  RETURNED: [],
+};
+
+export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
+  return ALLOWED_TRANSITIONS[from].includes(to);
+}
+
 /** The signed-in vendor's id, or null (not a vendor / no store). */
 export async function getSessionVendorId(): Promise<string | null> {
   const session = await auth();

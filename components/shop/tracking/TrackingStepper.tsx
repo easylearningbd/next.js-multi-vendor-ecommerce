@@ -8,11 +8,13 @@ const DOT: Record<TrackStepState, string> = {
   pending: "bg-line text-transparent",
   canceled: "bg-error text-white",
   returned: "bg-info text-white",
+  failed: "bg-error text-white",
 };
 const DOT_ICON: Partial<Record<TrackStepState, IconName>> = {
   done: "check",
   canceled: "x",
   returned: "refresh",
+  failed: "alert",
 };
 const DESC: Record<TrackStepState, string> = {
   done: "Completed",
@@ -20,6 +22,7 @@ const DESC: Record<TrackStepState, string> = {
   pending: "Pending",
   canceled: "This part of the order was canceled",
   returned: "This part of the order was returned",
+  failed: "The delivery attempt failed",
 };
 
 /**

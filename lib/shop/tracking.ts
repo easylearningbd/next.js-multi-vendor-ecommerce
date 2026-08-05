@@ -19,17 +19,45 @@ export const TRACKING_FLOW: { key: OrderStatus; label: string }[] = [
   { key: "DELIVERED", label: "Delivered" },
 ];
 
-export type TrackStepState = "done" | "current" | "pending" | "canceled" | "returned";
+export type TrackStepState =
+  | "done"
+  | "current"
+  | "pending"
+  | "canceled"
+  | "returned"
+  | "failed";
 export type TrackStep = { key: string; label: string; state: TrackStepState };
 
 /** Coarse kind of a sub-order's tracking state — drives the header/badge. */
-export type TrackKind = "in-progress" | "delivered" | "canceled" | "returned";
+export type TrackKind = "in-progress" | "delivered" | "canceled" | "returned" | "failed";
 
 export function trackingKind(status: OrderStatus): TrackKind {
   if (status === "CANCELED") return "canceled";
   if (status === "RETURNED") return "returned";
+  if (status === "FAILED_TO_DELIVER") return "failed";
   if (status === "DELIVERED") return "delivered";
   return "in-progress";
+}
+
+/**
+ * A whole-order status derived from its sub-orders — the order is only as far
+ * along as its LEAST-advanced seller (so it reads "Delivered" only when every
+ * sub-order is). Reads SubOrder.status (never a separate order-level field), so
+ * a vendor's sub-order change is reflected wherever an order-level status shows.
+ */
+const PROGRESS_RANK: Record<OrderStatus, number> = {
+  PENDING: 0,
+  CONFIRMED: 1,
+  PACKAGING: 2,
+  OUT_FOR_DELIVERY: 3,
+  DELIVERED: 4,
+  FAILED_TO_DELIVER: 4,
+  RETURNED: 5,
+  CANCELED: 5,
+};
+export function deriveOrderStatus(statuses: OrderStatus[]): OrderStatus {
+  if (statuses.length === 0) return "PENDING";
+  return statuses.reduce((a, b) => (PROGRESS_RANK[b] < PROGRESS_RANK[a] ? b : a));
 }
 
 /**
@@ -44,6 +72,19 @@ export function buildTrackingSteps(status: OrderStatus): TrackStep[] {
     return [
       { key: "PENDING", label: "Order placed", state: "done" },
       { key: "CANCELED", label: "Canceled", state: "canceled" },
+    ];
+  }
+
+  // Failed to deliver: it went out for delivery but the attempt failed — show the
+  // flow up to out-for-delivery done, then a distinct "Delivery failed" terminal.
+  if (status === "FAILED_TO_DELIVER") {
+    return [
+      ...TRACKING_FLOW.slice(0, 4).map((s) => ({
+        key: s.key,
+        label: s.label,
+        state: "done" as const,
+      })),
+      { key: "FAILED_TO_DELIVER", label: "Delivery failed", state: "failed" },
     ];
   }
 
