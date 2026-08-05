@@ -14,6 +14,7 @@ const LABELS: Record<OrderStatus, string> = {
   DELIVERED: "Delivered",
   CANCELED: "Canceled",
   RETURNED: "Returned",
+  FAILED_TO_DELIVER: "Failed to deliver",
 };
 
 export function OrderListControls() {

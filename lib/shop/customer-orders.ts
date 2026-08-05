@@ -19,6 +19,7 @@ export const ORDER_STATUS_FILTERS: OrderStatus[] = [
   "DELIVERED",
   "CANCELED",
   "RETURNED",
+  "FAILED_TO_DELIVER",
 ];
 
 export type CustomerOrderSummary = {

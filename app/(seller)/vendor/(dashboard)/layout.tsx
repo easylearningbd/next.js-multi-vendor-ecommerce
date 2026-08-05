@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/guard";
+import { prisma } from "@/lib/prisma";
 import { SellerShell } from "@/components/dashboard/SellerShell";
 
 // Persistent shell for the APPROVED vendor dashboard. Renders the header +
@@ -15,6 +16,11 @@ export default async function VendorDashboardLayout({
   const user = session.user;
   if (user.vendorStatus !== "APPROVED") redirect("/vendor/pending");
 
+  // Pending sub-orders needing this vendor's action → the "Order Manage" badge.
+  const pendingOrders = await prisma.subOrder.count({
+    where: { vendor: { userId: user.id }, status: "PENDING" },
+  });
+
   return (
     <SellerShell
       variant="vendor"
@@ -25,6 +31,7 @@ export default async function VendorDashboardLayout({
       notifCount={1}
       profileHref="/vendor/profile"
       changePasswordHref="/vendor/change-password"
+      badges={{ "Order Manage": pendingOrders }}
     >
       {children}
     </SellerShell>

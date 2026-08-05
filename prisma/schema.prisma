@@ -386,6 +386,7 @@ enum OrderStatus {
   DELIVERED
   CANCELED
   RETURNED
+  FAILED_TO_DELIVER
 }
 
 model Order {

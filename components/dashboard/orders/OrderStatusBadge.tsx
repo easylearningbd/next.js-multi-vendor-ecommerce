@@ -16,6 +16,7 @@ const ORDER_META: Record<OrderStatus, { label: string; tone: keyof typeof TONE }
   DELIVERED: { label: "Delivered", tone: "success" },
   CANCELED: { label: "Canceled", tone: "error" },
   RETURNED: { label: "Returned", tone: "info" },
+  FAILED_TO_DELIVER: { label: "Failed to deliver", tone: "error" },
 };
 
 const PAYMENT_META: Record<PaymentStatus, { label: string; tone: keyof typeof TONE }> = {

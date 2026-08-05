@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { signOutAction } from "@/lib/auth-actions";
 import { Icon, type IconName } from "./Icon";
 import { vendorNav, type SellerNavSection } from "./navConfig";
@@ -58,17 +58,28 @@ function deriveCrumbs(pathname: string): Crumb[] {
 }
 
 /**
- * Which dropdown child is "active" for the current path. Exact match wins; failing
- * that, the child whose href is the longest prefix wins — so e.g. /admin/vendors/[id]
- * keeps "Vendor List" (/admin/vendors) highlighted, while /admin/vendors/approval
- * still highlights only "Vendor Approval".
+ * Which dropdown child is "active" for the current URL. Query-param children
+ * (e.g. /vendor/orders?status=pending) match the FULL url first; plain children
+ * match by pathname (robust to unrelated params like ?page=2); failing exact,
+ * the child whose href is the longest path prefix wins — so e.g.
+ * /admin/vendors/[id] keeps "Vendor List" (/admin/vendors) highlighted.
  */
-function activeChildHref(children: { href: string }[], pathname: string): string | null {
-  const exact = children.find((c) => c.href === pathname);
-  if (exact) return exact.href;
+function activeChildHref(
+  children: { href: string }[],
+  pathname: string,
+  search: string,
+): string | null {
+  const full = search ? `${pathname}?${search}` : pathname;
+  // 1) query-aware exact match (highlights the selected ?status= filter)
+  const fullExact = children.find((c) => c.href === full);
+  if (fullExact) return fullExact.href;
+  // 2) pathname exact for plain (non-query) children
+  const pathExact = children.find((c) => !c.href.includes("?") && c.href === pathname);
+  if (pathExact) return pathExact.href;
+  // 3) longest path-prefix (path hierarchies)
   let best: string | null = null;
   for (const c of children) {
-    if (pathname.startsWith(`${c.href}/`) && (best === null || c.href.length > best.length)) {
+    if (!c.href.includes("?") && pathname.startsWith(`${c.href}/`) && (best === null || c.href.length > best.length)) {
       best = c.href;
     }
   }
@@ -111,6 +122,7 @@ export function SellerShell({
   const [open, setOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const isActive = (href: string) =>
     href !== "#" && (pathname === href || pathname.startsWith(`${href}/`));
   const crumbs = breadcrumb ?? deriveCrumbs(pathname);
@@ -134,6 +146,8 @@ export function SellerShell({
   useEffect(() => {
     const active = groupsWithActiveChild();
     if (active.length) {
+      // Intentional: sync the open groups to the active route on navigation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenGroups((prev) => {
         const next = new Set(prev);
         active.forEach((l) => next.add(l));
@@ -186,7 +200,7 @@ export function SellerShell({
                   if (item.children) {
                     // Longest-match-wins so the active child is unambiguous even when
                     // one href is a prefix of another (e.g. /admin/vendors vs /admin/vendors/add).
-                    const activeHref = activeChildHref(item.children, pathname);
+                    const activeHref = activeChildHref(item.children, pathname, search);
                     const childActive = activeHref !== null;
                     const isOpen = openGroups.has(item.label);
                     const badge = badges?.[item.label] ?? 0;
