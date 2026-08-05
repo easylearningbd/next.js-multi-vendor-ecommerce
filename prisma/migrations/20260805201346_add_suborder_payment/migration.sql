@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `suborder` ADD COLUMN `paidAt` DATETIME(3) NULL,
+    ADD COLUMN `paymentStatus` ENUM('UNPAID', 'PAID', 'REFUNDED') NOT NULL DEFAULT 'UNPAID';

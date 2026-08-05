@@ -108,13 +108,13 @@ export async function getVendorSubOrders(
         id: true,
         status: true,
         total: true,
+        paymentStatus: true, // THIS vendor's own payment (per sub-order)
         order: {
           select: {
             orderNumber: true,
             createdAt: true,
             shipName: true,
             shipPhone: true,
-            paymentStatus: true,
           },
         },
         items: { select: { qty: true } },
@@ -131,7 +131,7 @@ export async function getVendorSubOrders(
       customerPhone: r.order.shipPhone,
       itemCount: r.items.reduce((n, i) => n + i.qty, 0),
       amount: r.total.toString(),
-      paymentStatus: r.order.paymentStatus,
+      paymentStatus: r.paymentStatus,
       status: r.status,
     })),
     total,
@@ -179,6 +179,8 @@ export async function getVendorSubOrder(id: string, vendorId: string) {
     select: {
       id: true,
       status: true,
+      paymentStatus: true, // this vendor's own payment
+      paidAt: true,
       subtotal: true,
       discount: true,
       total: true,

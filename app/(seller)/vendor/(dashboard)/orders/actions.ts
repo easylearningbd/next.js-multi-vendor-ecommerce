@@ -69,3 +69,62 @@ export async function updateSubOrderStatus(input: {
   revalidatePath("/dashboard/track-order");
   return { ok: true, status };
 }
+
+export type UpdatePaymentResult = { ok: true; paid: boolean } | { ok: false; error: string };
+
+const paymentSchema = z.object({ subOrderId: z.string().trim().min(1), paid: z.boolean() });
+
+/**
+ * A vendor marks THEIR sub-order paid/unpaid. COD is collected per vendor on
+ * delivery, so marking Paid is allowed ONLY once the sub-order is DELIVERED.
+ * The sub-order's `total` is the vendor's realized earning once PAID (stamped
+ * with `paidAt`). Rolls the parent Order.paymentStatus up to PAID only when
+ * EVERY sub-order is paid, so the customer's order view stays correct.
+ */
+export async function updateSubOrderPayment(input: {
+  subOrderId: string;
+  paid: boolean;
+}): Promise<UpdatePaymentResult> {
+  const vendorId = await getSessionVendorId();
+  if (!vendorId) return { ok: false, error: "You are not authorized to perform this action." };
+
+  const parsed = paymentSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid request." };
+  const { subOrderId, paid } = parsed.data;
+
+  const sub = await prisma.subOrder.findFirst({
+    where: { id: subOrderId, vendorId },
+    select: { status: true, paymentStatus: true, orderId: true, order: { select: { orderNumber: true } } },
+  });
+  if (!sub) return { ok: false, error: "Order not found." };
+
+  if (paid && sub.status !== "DELIVERED") {
+    return { ok: false, error: "You can mark payment as paid only after the order is delivered." };
+  }
+
+  const next = paid ? "PAID" : "UNPAID";
+  if (sub.paymentStatus === next) return { ok: true, paid };
+
+  try {
+    await prisma.subOrder.update({
+      where: { id: subOrderId },
+      data: { paymentStatus: next, paidAt: paid ? new Date() : null },
+    });
+  } catch {
+    return { ok: false, error: "Couldn't update payment. Please try again." };
+  }
+
+  // Order-level rollup: PAID only when no sub-order is still unpaid.
+  const unpaid = await prisma.subOrder.count({
+    where: { orderId: sub.orderId, paymentStatus: { not: "PAID" } },
+  });
+  await prisma.order.update({
+    where: { id: sub.orderId },
+    data: { paymentStatus: unpaid === 0 ? "PAID" : "UNPAID" },
+  });
+
+  revalidatePath(`/vendor/orders/${subOrderId}`);
+  revalidatePath("/vendor/orders");
+  revalidatePath(`/dashboard/orders/${sub.order.orderNumber}`);
+  return { ok: true, paid };
+}

@@ -3,12 +3,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { formatMoney } from "@/lib/shop/pricing";
 import { Icon } from "@/components/dashboard/Icon";
-import {
-  OrderStatusBadge,
-  PaymentStatusBadge,
-} from "@/components/dashboard/orders/OrderStatusBadge";
+import { OrderStatusBadge } from "@/components/dashboard/orders/OrderStatusBadge";
 import { getSessionVendorId, getVendorSubOrder } from "@/lib/vendor/orders";
 import { VendorStatusControl } from "@/components/vendor-orders/VendorStatusControl";
+import { VendorPaymentControl } from "@/components/vendor-orders/VendorPaymentControl";
 
 export const metadata: Metadata = { title: "Order Details — Covet Seller" };
 export const dynamic = "force-dynamic";
@@ -148,11 +146,17 @@ export default async function VendorOrderDetailsPage({
             <VendorStatusControl subOrderId={sub.id} currentStatus={sub.status} />
 
             <div className="mt-4 flex items-center justify-between rounded-xl border border-line px-3.5 py-3">
-              <span className="font-sans text-[13px] text-ink-soft">Payment</span>
-              <span className="flex items-center gap-2 font-sans text-[12.5px] text-muted">
-                {paymentLabel}
-                <PaymentStatusBadge status={sub.order.paymentStatus} />
-              </span>
+              <span className="font-sans text-[13px] text-ink-soft">Payment method</span>
+              <span className="font-sans text-[12.5px] font-semibold text-ink">{paymentLabel}</span>
+            </div>
+
+            <div className="mt-3">
+              <VendorPaymentControl
+                subOrderId={sub.id}
+                status={sub.status}
+                paymentStatus={sub.paymentStatus}
+                paidAt={sub.paidAt ? sub.paidAt.toISOString() : null}
+              />
             </div>
 
             <div className="mt-4 flex gap-2.5 rounded-xl border border-warning-bg bg-warning-bg/40 p-3.5">

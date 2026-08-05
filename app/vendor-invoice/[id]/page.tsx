@@ -83,7 +83,7 @@ export default async function VendorInvoicePage({
             </div>
             <div className="font-sans text-[13px] leading-[1.6] text-ink-soft">
               <div className="font-semibold text-ink">{paymentLabel}</div>
-              <div className="text-muted">{sub.order.paymentStatus === "PAID" ? "Paid" : "Unpaid"}</div>
+              <div className="text-muted">{sub.paymentStatus === "PAID" ? "Paid" : "Unpaid"}</div>
               <div className="mt-1 text-muted">Status: {sub.status}</div>
             </div>
           </div>

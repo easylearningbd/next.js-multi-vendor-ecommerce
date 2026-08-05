@@ -451,9 +451,15 @@ model SubOrder {
 
   couponId String? // the vendor coupon applied to THIS sub-order, if any
 
-  status    OrderStatus @default(PENDING)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  status OrderStatus @default(PENDING)
+  // This vendor's OWN payment for their slice (COD is collected per vendor on
+  // delivery). `total` above is the vendor's realized earning once PAID; `paidAt`
+  // stamps when — both feed the vendor earnings report.
+  paymentStatus PaymentStatus @default(UNPAID)
+  paidAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   order  Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vendor Vendor      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
