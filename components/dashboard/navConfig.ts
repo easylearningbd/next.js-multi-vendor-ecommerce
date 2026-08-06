@@ -101,6 +101,21 @@ export const adminNav: SellerNavSection[] = [
           { label: "Popular Product", href: "/admin/products/popular" },
         ],
       },
+      {
+        label: "Order Manage",
+        icon: "order",
+        children: [
+          { label: "All", href: "/admin/orders" },
+          { label: "Pending", href: "/admin/orders?status=pending" },
+          { label: "Confirmed", href: "/admin/orders?status=confirmed" },
+          { label: "Packaging", href: "/admin/orders?status=packaging" },
+          { label: "Out For Delivery", href: "/admin/orders?status=out-for-delivery" },
+          { label: "Delivered", href: "/admin/orders?status=delivered" },
+          { label: "Returned", href: "/admin/orders?status=returned" },
+          { label: "Failed To Deliver", href: "/admin/orders?status=failed-to-deliver" },
+          { label: "Canceled", href: "/admin/orders?status=canceled" },
+        ],
+      },
     ],
   },
 ];
