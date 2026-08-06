@@ -49,6 +49,15 @@ export const vendorNav: SellerNavSection[] = [
           { label: "Canceled", href: "/vendor/orders?status=canceled" },
         ],
       },
+      {
+        label: "Report Manage",
+        icon: "chart",
+        children: [
+          { label: "Transactions Report", href: "/vendor/reports/transactions" },
+          { label: "Product Report", href: "/vendor/reports/products" },
+          { label: "Order Report", href: "/vendor/reports/orders" },
+        ],
+      },
       { label: "POS", href: "#", icon: "pos" },
     ],
   },
