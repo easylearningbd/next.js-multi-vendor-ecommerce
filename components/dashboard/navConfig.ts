@@ -116,6 +116,14 @@ export const adminNav: SellerNavSection[] = [
           { label: "Canceled", href: "/admin/orders?status=canceled" },
         ],
       },
+      {
+        label: "Review Manage",
+        icon: "star",
+        children: [
+          { label: "Customer Review", href: "/admin/reviews" },
+          { label: "Customer List", href: "/admin/customers" },
+        ],
+      },
     ],
   },
 ];

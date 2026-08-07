@@ -516,6 +516,10 @@ model Review {
   images  Json? // optional string[] of uploaded image paths
 
   status    ReviewStatus @default(PENDING)
+  // Admin show/hide for an ALREADY-APPROVED review (moderation ≠ visibility).
+  // Storefront rule: show where status=APPROVED AND isVisible=true. Default true so
+  // existing approved reviews stay visible after this column is added.
+  isVisible Boolean      @default(true)
   createdAt DateTime     @default(now())
 
   // Cascade: a review is dependent data — it goes if the product, customer, or the

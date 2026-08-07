@@ -4,8 +4,13 @@ import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/dashboard/Icon";
 
-/** Order-list search (order number or customer). Preserves ?status, resets page. */
-export function AdminOrderSearch() {
+/** Admin list search — writes ?search, preserves ?status, resets page. Shared by
+ *  the order + review lists (placeholder configurable). */
+export function AdminOrderSearch({
+  placeholder = "Search by Order ID or customer",
+}: {
+  placeholder?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -31,7 +36,7 @@ export function AdminOrderSearch() {
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Search by Order ID or customer"
+        placeholder={placeholder}
         className="h-full min-w-0 flex-1 bg-transparent px-3.5 font-sans text-[13px] text-ink outline-none placeholder:text-muted-soft"
       />
       {value && (

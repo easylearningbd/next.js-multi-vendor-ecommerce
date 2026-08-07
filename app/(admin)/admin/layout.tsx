@@ -17,10 +17,11 @@ export default async function AdminLayout({
   // Pending queue counts → sidebar group badges. Orders use the same rule the list
   // filter will use: an order counts as "Pending" if ANY of its sub-orders is PENDING
   // (sub-order status is the live fulfillment truth; the parent Order.status is stale).
-  const [pendingVendors, pendingProducts, pendingOrders] = await Promise.all([
+  const [pendingVendors, pendingProducts, pendingOrders, pendingReviews] = await Promise.all([
     prisma.vendor.count({ where: { status: "PENDING" } }),
     prisma.product.count({ where: { approvalStatus: "PENDING" } }),
     prisma.order.count({ where: { subOrders: { some: { status: "PENDING" } } } }),
+    prisma.review.count({ where: { status: "PENDING" } }),
   ]);
 
   return (
@@ -38,6 +39,7 @@ export default async function AdminLayout({
         "Vendor Manage": pendingVendors,
         "Product Manage": pendingProducts,
         "Order Manage": pendingOrders,
+        "Review Manage": pendingReviews,
       }}
     >
       {children}
