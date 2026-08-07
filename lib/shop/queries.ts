@@ -113,6 +113,12 @@ export const CARD_SELECT = {
   brand: { select: { name: true, slug: true } },
   // Variation stock lets us compute in-stock without a second query (no N+1).
   variations: { select: { stock: true } },
+  // Public reviews (APPROVED + visible) so every card shows a real average rating
+  // + review count — same rule as the product page. Nested select, no N+1.
+  reviews: {
+    where: { status: "APPROVED", isVisible: true },
+    select: { rating: true },
+  },
 } satisfies Prisma.ProductSelect;
 
 export type CardRow = Prisma.ProductGetPayload<{ select: typeof CARD_SELECT }>;
@@ -136,7 +142,7 @@ export type StorefrontProduct = {
   inStock: boolean;
   isFeatured: boolean;
   isPopular: boolean;
-  /** TODO(reviews): no Review model yet — always null / 0 for now. */
+  /** Average of APPROVED + visible reviews (1-dp), or null when none. */
   rating: number | null;
   reviewCount: number;
   createdAt: string;
@@ -147,6 +153,11 @@ export function toCard(p: CardRow): StorefrontProduct {
   const variationStock = p.variations.reduce((sum, v) => sum + v.stock, 0);
   const inStock = hasVariations ? variationStock > 0 : p.stock > 0;
   const pricing = computeCardPricing(p);
+
+  const reviewCount = p.reviews.length;
+  const rating = reviewCount
+    ? Math.round((p.reviews.reduce((s, r) => s + r.rating, 0) / reviewCount) * 10) / 10
+    : null;
 
   return {
     id: p.id,
@@ -162,8 +173,8 @@ export function toCard(p: CardRow): StorefrontProduct {
     inStock,
     isFeatured: p.isFeatured,
     isPopular: p.isPopular,
-    rating: null,
-    reviewCount: 0,
+    rating,
+    reviewCount,
     createdAt: p.createdAt.toISOString(),
   };
 }
@@ -544,6 +555,10 @@ export const getProductBySlug = cache(async function getProductBySlug(
           image: true,
           attributes: true,
         },
+      },
+      reviews: {
+        where: { status: "APPROVED", isVisible: true },
+        select: { rating: true },
       },
     },
   });

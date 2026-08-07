@@ -149,9 +149,25 @@ function QuickViewBody({ product }: { product: QuickViewProduct }) {
         </Link>
 
         <div className="flex items-center gap-4 border-b border-line-soft pb-[18px] font-sans text-[13.5px] text-muted">
-          <span>
-            <span className="font-semibold text-ink">{product.reviewCount}</span>{" "}
-            Reviews
+          <span className="flex items-center gap-1.5">
+            <span className="flex gap-0.5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Icon
+                  key={i}
+                  name="star"
+                  size={14}
+                  className={i < Math.round(product.rating ?? 0) ? "text-star" : "text-line"}
+                />
+              ))}
+            </span>
+            {product.reviewCount > 0 ? (
+              <span>
+                <span className="font-semibold text-ink">{product.rating?.toFixed(1)}</span> (
+                {product.reviewCount})
+              </span>
+            ) : (
+              <span>No reviews yet</span>
+            )}
           </span>
           <span className="h-3.5 w-px bg-line" />
           <span>{product.categoryName}</span>
