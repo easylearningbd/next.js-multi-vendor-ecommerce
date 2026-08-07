@@ -121,3 +121,49 @@ export async function getAdminReviews(
     counts,
   };
 }
+
+/**
+ * ONE review with everything the moderation page shows: product + seller, the
+ * customer, full comment + images, current status/visibility, and the order
+ * reference behind it (via orderItem → subOrder → order) which PROVES the review
+ * came from a real verified purchase. Returns null → caller 404s.
+ */
+export async function getAdminReview(id: string) {
+  return prisma.review.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      rating: true,
+      title: true,
+      comment: true,
+      images: true,
+      status: true,
+      isVisible: true,
+      createdAt: true,
+      product: {
+        select: {
+          name: true,
+          slug: true,
+          thumbnail: true,
+          vendor: { select: { storeName: true, slug: true } },
+        },
+      },
+      customer: { select: { name: true, email: true, image: true, createdAt: true } },
+      orderItem: {
+        select: {
+          productName: true,
+          variantLabel: true,
+          qty: true,
+          unitPrice: true,
+          subOrder: {
+            select: {
+              order: { select: { orderNumber: true, createdAt: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export type AdminReviewDetail = NonNullable<Awaited<ReturnType<typeof getAdminReview>>>;

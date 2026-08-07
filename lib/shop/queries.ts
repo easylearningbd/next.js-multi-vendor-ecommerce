@@ -678,13 +678,15 @@ const REVIEW_DATE_FMT = new Intl.DateTimeFormat("en-US", {
 });
 
 /**
- * Public product reviews — APPROVED only (PENDING/REJECTED never reach shoppers).
- * The product's displayed rating is the mean of these approved reviews, so it is
- * recomputed on every load (and on revalidation after an admin approves/rejects).
+ * Public product reviews — shown only when status=APPROVED AND isVisible=true
+ * (PENDING/REJECTED never reach shoppers; an admin can also hide an approved
+ * review via isVisible). The product's displayed rating is the mean of these
+ * reviews, so it is recomputed on every load (and on revalidation after an admin
+ * approves/rejects or toggles visibility).
  */
 export async function getProductReviews(productId: string): Promise<ProductReviews> {
   const rows = await prisma.review.findMany({
-    where: { productId, status: "APPROVED" },
+    where: { productId, status: "APPROVED", isVisible: true },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
